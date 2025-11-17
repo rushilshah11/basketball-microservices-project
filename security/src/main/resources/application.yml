@@ -1,8 +1,13 @@
+server:
+  port: 8082
+
 spring:
+  application:
+    name: security-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/bball-microservice
+    url: jdbc:postgresql://localhost:5432/bball-security
     driver-class-name: org.postgresql.Driver
-    username: postgres
+    username: ashwi
     password: 
   jpa: 
     hibernate:
@@ -13,3 +18,13 @@ spring:
         format_sql: true
     database: postgresql
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
