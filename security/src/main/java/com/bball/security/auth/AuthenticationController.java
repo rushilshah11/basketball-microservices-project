@@ -29,6 +29,12 @@ public class AuthenticationController {
     {
         return ResponseEntity.ok(service.authenticate(request));
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<LogoutResponse> logout() {
+        return ResponseEntity.ok(service.logout());
+    }
+
 //
 //    @PostMapping("/refresh-token")
 //    public void refreshToken(

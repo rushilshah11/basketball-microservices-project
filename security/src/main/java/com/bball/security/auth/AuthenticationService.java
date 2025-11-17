@@ -7,6 +7,7 @@ import com.bball.security.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -44,5 +45,20 @@ public class AuthenticationService {
         var jwtToken = jwtService.generateToken(user);
 
         return AuthenticationResponse.builder().token(jwtToken).build();
+    }
+
+    public LogoutResponse logout() {
+        // Clear the security context
+        SecurityContextHolder.clearContext();
+        
+        // TODO: For production, implement token blacklist:
+        // 1. Store invalidated tokens in Redis with TTL matching token expiration
+        // 2. Check blacklist in JwtAuthenticationFilter before validating token
+        // 3. This prevents token reuse until natural expiration
+        
+        return LogoutResponse.builder()
+                .message("Logged out successfully. Please delete the token on the client side.")
+                .timestamp(System.currentTimeMillis())
+                .build();
     }
 }
