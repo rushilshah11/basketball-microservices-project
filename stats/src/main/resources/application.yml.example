@@ -1,0 +1,39 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: stats-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bball-stats
+    driver-class-name: org.postgresql.Driver
+    username: YOUR_POSTGRES_USERNAME
+    password: YOUR_POSTGRES_PASSWORD
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
+
+# NBA API Configuration (RapidAPI)
+# Get your API key from: https://rapidapi.com/api-sports/api/api-nba
+nba:
+  api:
+    base-url: https://api-nba-v1.p.rapidapi.com
+    api-key: YOUR_RAPIDAPI_KEY_HERE
+    api-host: api-nba-v1.p.rapidapi.com
+
