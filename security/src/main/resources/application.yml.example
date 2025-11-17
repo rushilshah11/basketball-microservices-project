@@ -7,8 +7,8 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/bball-security
     driver-class-name: org.postgresql.Driver
-    username: ashwi
-    password: 
+    username: YOUR_POSTGRES_USERNAME
+    password: YOUR_POSTGRES_PASSWORD
   jpa: 
     hibernate:
       ddl-auto: create-drop
@@ -28,3 +28,5 @@ eureka:
   instance:
     hostname: localhost
     prefer-ip-address: false
+
+
