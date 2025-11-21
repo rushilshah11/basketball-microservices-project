@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package com.bball.common;
+
+option java_multiple_files = true;
+option java_package = "com.bball.common.grpc";
+
+service AuthService {
+  // We send a token, we get back a User ID (or error)
+  rpc verifyToken (VerifyTokenRequest) returns (VerifyTokenResponse);
+}
+
+message VerifyTokenRequest {
+  string token = 1;
+}
+
+message VerifyTokenResponse {
+  bool valid = 1;
+  string userId = 2;
+  string email = 3;
+}
