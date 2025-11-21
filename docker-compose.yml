@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # ------------------------------------------------------------------------
+  # 1. Database for Auth-Service (Security)
+  # ------------------------------------------------------------------------
+  db-security:
+    image: postgres:15-alpine
+    container_name: bball_db_security
+    environment:
+      POSTGRES_DB: bball-security
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password  # DEVELOPMENT PASSWORD ONLY
+    ports:
+      - "5433:5432"               # Host Port 5433 -> Container Port 5432 (for DBeaver access)
+    volumes:
+      - postgres_security_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d bball-security"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------------
+  # 2. Database for Stats-Service
+  # ------------------------------------------------------------------------
+  db-stats:
+    image: postgres:15-alpine
+    container_name: bball_db_stats
+    environment:
+      POSTGRES_DB: bball-stats
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5434:5432"               # Host Port 5434 -> Container Port 5432 (for DBeaver access)
+    volumes:
+      - postgres_stats_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d bball-stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------------
+  # 3. Eureka Server (Service Discovery)
+  # ------------------------------------------------------------------------
+  eureka-server:
+    build:
+      context: ./eureka-server
+      args:
+        # Reference the JAR file you just built
+        - JAR_FILE=target/eureka-server-0.0.1-SNAPSHOT.jar
+    container_name: bball_eureka_server
+    ports:
+      - "8761:8761"               # Expose Eureka dashboard
+    environment:
+      # Use service name for inter-container communication
+      EUREKA_INSTANCE_HOSTNAME: eureka-server
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      db-security:
+        condition: service_healthy
+      db-stats:
+        condition: service_healthy
+
+  # ------------------------------------------------------------------------
+  # 4. Security Service (Auth-Service)
+  # ------------------------------------------------------------------------
+  security-service:
+    build:
+      context: ./security
+      args:
+        - JAR_FILE=target/security-0.0.1-SNAPSHOT.jar
+    container_name: bball_security_service
+    ports:
+      - "8082:8082"               # Expose Security API endpoint
+    environment:
+      # Link DB and Eureka using container service names
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-security:5432/bball-security
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: password
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_started
+
+  # ------------------------------------------------------------------------
+  # 5. Stats Service
+  # ------------------------------------------------------------------------
+  stats-service:
+    build:
+      context: ./stats
+      args:
+        - JAR_FILE=target/stats-0.0.1-SNAPSHOT.jar
+    container_name: bball_stats_service
+    ports:
+      - "8081:8081"               # Expose Stats API endpoint
+    environment:
+      # Link DB and Eureka using container service names
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-stats:5432/bball-stats
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: password
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      # !!! IMPORTANT: Replace this with your actual RapidAPI Key
+      NBA_API_API_KEY: 98ca86cc665616dbdc6096a71a3df7ca
+    depends_on:
+      eureka-server:
+        condition: service_started
+      security-service:
+        condition: service_started
+
+volumes:
+  postgres_security_data:
+  postgres_stats_data:
