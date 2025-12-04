@@ -13,5 +13,6 @@ public class PlayerResponse {
     
     private Long id;
     private String fullName;
+    private String teamName;
 }
 

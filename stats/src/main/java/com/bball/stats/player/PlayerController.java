@@ -54,5 +54,15 @@ public class PlayerController {
         }
     }
 
+    // New Stats Endpoint
+    @GetMapping("/{playerId}/stats")
+    public ResponseEntity<PlayerStatsResponse> getPlayerStats(@PathVariable Long playerId) {
+        try {
+            return ResponseEntity.ok(playerService.getPlayerStats(playerId));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
 }
 
