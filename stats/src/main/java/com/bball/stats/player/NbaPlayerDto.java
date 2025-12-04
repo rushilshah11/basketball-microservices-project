@@ -24,15 +24,5 @@ public class NbaPlayerDto {
     
     @JsonProperty("lastname")
     private String lastname;
-
-    @JsonProperty("team")
-    private NbaTeamDto team;
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class NbaTeamDto {
-        private Long id;
-        private String name;
-    }
 }
 
