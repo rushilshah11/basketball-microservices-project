@@ -109,6 +109,18 @@ services:
       security-service:
         condition: service_started
 
+  # ------------------------------------------------------------------------
+  # 6. NBA Fetcher (Python Sidecar) - NEW!
+  # ------------------------------------------------------------------------
+  nba-fetcher:
+    build:
+      context: ./nba-fetcher/.venv
+    container_name: bball_nba_fetcher
+    ports:
+      - "5001:5000" # Expose port 5001
+    networks:
+      - default
+
 volumes:
   postgres_security_data:
   postgres_stats_data:

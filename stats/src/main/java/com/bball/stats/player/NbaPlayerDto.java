@@ -12,17 +12,18 @@ import lombok.Data;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class NbaPlayerDto {
-    
-    @JsonProperty("id")
     private Long id;
-    
-    @JsonProperty("name")
-    private String name;
-    
-    @JsonProperty("firstname")
-    private String firstname;
-    
-    @JsonProperty("lastname")
-    private String lastname;
+
+    @JsonProperty("full_name")
+    private String fullName;
+
+    @JsonProperty("first_name")
+    private String firstName;
+
+    @JsonProperty("last_name")
+    private String lastName;
+
+    @JsonProperty("is_active")
+    private boolean isActive;
 }
 
