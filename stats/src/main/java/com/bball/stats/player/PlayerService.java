@@ -3,6 +3,7 @@ package com.bball.stats.player;
 import com.bball.stats.config.NbaApiConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -75,6 +76,7 @@ public class PlayerService {
     }
 
     // --- 2. Batch Search (Trending) ---
+    @Cacheable(value = "trending_players", unless = "#result.isEmpty()")
     public List<PlayerResponse> searchPlayersBatch(List<String> names) {
         String url = nbaApiConfig.getBaseUrl() + "/players/batch";
 
@@ -101,6 +103,7 @@ public class PlayerService {
     }
 
     // --- 3. Stats ---
+    @Cacheable(value = "player_stats", key = "#name")
     public PlayerStatsResponse getPlayerStats(String name) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(nbaApiConfig.getBaseUrl())
@@ -117,6 +120,7 @@ public class PlayerService {
     }
 
     // --- 4. Game Log (With Limit) ---
+    @Cacheable(value = "game_logs", key = "#name + '-' + #limit")
     public List<GameLogResponse> getPlayerGameLog(String name, int limit) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(nbaApiConfig.getBaseUrl())
