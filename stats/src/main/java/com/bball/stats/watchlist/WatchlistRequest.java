@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class WatchlistRequest {
     
-    private Long playerId;
+    private String playerName;
 }
 

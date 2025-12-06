@@ -18,9 +18,10 @@ public class Watchlist {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "player_id", nullable = false)
-    private Long playerId;
+    // CHANGED: Store Name instead of ID
+    @Column(name = "player_name", nullable = false)
+    private String playerName;
 
     @Column(name = "user_id", nullable = false)
-    private Integer userId;  // Foreign key reference to User.id in security service
+    private Integer userId;
 }

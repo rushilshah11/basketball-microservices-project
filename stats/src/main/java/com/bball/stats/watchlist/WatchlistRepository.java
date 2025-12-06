@@ -12,8 +12,8 @@ public interface WatchlistRepository extends JpaRepository<Watchlist, Long> {
     
     List<Watchlist> findByUserId(Integer userId);
     
-    Optional<Watchlist> findByUserIdAndPlayerId(Integer userId, Long playerId);
+    Optional<Watchlist> findByUserIdAndPlayerName(Integer userId, String playerName);
     
-    void deleteByUserIdAndPlayerId(Integer userId, Long playerId);
+    void deleteByUserIdAndPlayerName(Integer userId, String playerName);
 }
 

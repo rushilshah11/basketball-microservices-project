@@ -20,12 +20,8 @@ public class WatchlistController {
     public ResponseEntity<List<WatchlistResponse>> getUserWatchlist(
             @RequestHeader("Authorization") String token
     ) {
-        // 1. Call Security Service via gRPC to get User ID
         Integer userId = authClient.verifyUser(token);
-
-        // 2. Proceed with trusted ID
-        List<WatchlistResponse> response = service.getUserWatchlist(userId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(service.getUserWatchlist(userId));
     }
 
     @PostMapping
@@ -33,40 +29,39 @@ public class WatchlistController {
             @RequestHeader("Authorization") String token,
             @RequestBody WatchlistRequest request
     ) {
-        // 1. Call Security Service via gRPC to get User ID
         Integer userId = authClient.verifyUser(token);
-
         try {
-            WatchlistResponse response = service.addPlayerToWatchlist(userId, request.getPlayerId());
+            // Now accepts Name
+            WatchlistResponse response = service.addPlayerToWatchlist(userId, request.getPlayerName());
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(WatchlistResponse.builder().message(e.getMessage()).build());
         }
     }
 
-    @DeleteMapping("/{playerId}")
+    // CHANGED: @PathVariable is now a String name, not Long id
+    @DeleteMapping("/{playerName}")
     public ResponseEntity<WatchlistResponse> removePlayerFromWatchlist(
-            @PathVariable Long playerId,
+            @PathVariable String playerName,
             @RequestHeader("Authorization") String token
     ) {
         Integer userId = authClient.verifyUser(token);
-
         try {
-            WatchlistResponse response = service.removePlayerFromWatchlist(userId, playerId);
+            WatchlistResponse response = service.removePlayerFromWatchlist(userId, playerName);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
 
-    @GetMapping("/check/{playerId}")
+    // CHANGED: @PathVariable is now a String name
+    @GetMapping("/check/{playerName}")
     public ResponseEntity<WatchlistResponse> checkPlayerInWatchlist(
-            @PathVariable Long playerId,
+            @PathVariable String playerName,
             @RequestHeader("Authorization") String token
     ) {
         Integer userId = authClient.verifyUser(token);
-
-        WatchlistResponse response = service.checkPlayerInWatchlist(userId, playerId);
+        WatchlistResponse response = service.checkPlayerInWatchlist(userId, playerName);
         return ResponseEntity.ok(response);
     }
 }

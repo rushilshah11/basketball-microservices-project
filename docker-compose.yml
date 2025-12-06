@@ -103,10 +103,14 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       # !!! IMPORTANT: Replace this with your actual RapidAPI Key
       NBA_API_BASE_URL: http://nba-fetcher:5000
+      SPRING_DATA_REDIS_HOST: redis  # Matches the service name 'redis' below
+      SPRING_DATA_REDIS_PORT: 6379
     depends_on:
       eureka-server:
         condition: service_started
       security-service:
+        condition: service_started
+      redis:
         condition: service_started
 
   # ------------------------------------------------------------------------
