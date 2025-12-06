@@ -3,6 +3,7 @@ package com.bball.stats.player;
 import com.bball.stats.config.NbaApiConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -73,14 +74,14 @@ public class PlayerService {
     /**
      * Fetch Stats using Python Sidecar by ID
      */
-    public PlayerStatsResponse getPlayerStats(Long playerId) {
+    public PlayerStatsResponse getPlayerStats(String name) {
         // Python endpoint supports ID lookup: /player/{id}/stats
-        String url = nbaApiConfig.getBaseUrl() + "/player/" + playerId + "/stats";
+        String url = nbaApiConfig.getBaseUrl() + "/player/" + name + "/stats";
 
         try {
             return restTemplate.getForObject(url, PlayerStatsResponse.class);
         } catch (Exception e) {
-            log.error("Error fetching stats from python for ID {}: {}", playerId, e.getMessage());
+            log.error("Error fetching stats from python for ID {}: {}", name, e.getMessage());
             throw new RuntimeException("Failed to fetch stats");
         }
     }
@@ -94,6 +95,33 @@ public class PlayerService {
         // Implementation left as exercise or reused logic
         // Python currently relies on Name lookup primarily, but we can add ID lookup later.
         return PlayerResponse.builder().id(playerId).fullName("Unknown").build();
+    }
+
+    /**
+     * Fetch the game log (last N games) for a specific player from the Python sidecar.
+     * Endpoint: /player/{id}/games
+     */
+    public List<GameLogResponse> getPlayerGameLog(String name) {
+        // Construct URL: http://nba-fetcher:5000/player/{id}/games?limit=5
+        // We add "limit=5" assuming your Python sidecar handles that parameter
+        String url = nbaApiConfig.getBaseUrl() + "/player/" + name + "/games";
+
+        try {
+            // Use exchange() with ParameterizedTypeReference to safely map a JSON Array to a List<T>
+            ResponseEntity<List<GameLogResponse>> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<GameLogResponse>>() {}
+            );
+
+            return response.getBody() != null ? response.getBody() : Collections.emptyList();
+
+        } catch (Exception e) {
+            log.error("Error fetching game log for player name {}: {}", name, e.getMessage());
+            // Return empty list instead of crashing, so the frontend just shows "No games found"
+            return Collections.emptyList();
+        }
     }
 }
 

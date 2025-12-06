@@ -11,7 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PlayerStatsResponse {
 
-    private Long id;
     private String season;
     private Integer gamesPlayed;
 
@@ -19,7 +18,4 @@ public class PlayerStatsResponse {
     private Double ppg;      // Points Per Game
     private Double apg;      // Assists Per Game
     private Double rpg;      // Rebounds Per Game
-
-    // Optional: Turnovers Per Game if you plan to calculate it later
-    private Double topg;
 }
