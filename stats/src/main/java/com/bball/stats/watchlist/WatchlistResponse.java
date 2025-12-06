@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 public class WatchlistResponse {
     
     private Long id;
-    private Long playerId;
+    private String playerName;
     private Integer userId;
     private String message;
 }

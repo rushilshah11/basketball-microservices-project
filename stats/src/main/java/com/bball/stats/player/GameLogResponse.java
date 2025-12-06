@@ -5,11 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
+
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class GameLogResponse {
+public class GameLogResponse implements Serializable {
     private String gameId;
     private String gameDate;
     private String matchup; // e.g., "LAL @ GSW"
