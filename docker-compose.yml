@@ -102,7 +102,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: password
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       # !!! IMPORTANT: Replace this with your actual RapidAPI Key
-      NBA_API_API_KEY: 98ca86cc665616dbdc6096a71a3df7ca
+      NBA_API_BASE_URL: http://nba-fetcher:5000
     depends_on:
       eureka-server:
         condition: service_started
@@ -114,7 +114,7 @@ services:
   # ------------------------------------------------------------------------
   nba-fetcher:
     build:
-      context: ./nba-fetcher/.venv
+      context: ./nba-fetcher
     container_name: bball_nba_fetcher
     ports:
       - "5001:5000" # Expose port 5001
