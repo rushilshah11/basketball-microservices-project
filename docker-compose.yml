@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password  # DEVELOPMENT PASSWORD ONLY
     ports:
-      - "5433:5432"               # Host Port 5433 -> Container Port 5432 (for DBeaver access)
+      - "5435:5432"               # Host Port 5435 -> Container Port 5432 (for DBeaver access)
     volumes:
       - postgres_security_data:/var/lib/postgresql/data
     healthcheck:
