@@ -144,6 +144,8 @@ services:
       - "5002:5002"
     environment:
       PYTHONUNBUFFERED: 1
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     networks:
       - default
 
