@@ -24,6 +24,15 @@ public class WatchlistController {
         return ResponseEntity.ok(service.getUserWatchlist(userId));
     }
 
+    // NEW: Get watchlist with full player details (stats cached in Redis)
+    @GetMapping("/details")
+    public ResponseEntity<List<WatchlistDetailedResponse>> getUserWatchlistWithDetails(
+            @RequestHeader("Authorization") String token
+    ) {
+        Integer userId = authClient.verifyUser(token);
+        return ResponseEntity.ok(service.getUserWatchlistWithDetails(userId));
+    }
+
     @PostMapping
     public ResponseEntity<WatchlistResponse> addPlayerToWatchlist(
             @RequestHeader("Authorization") String token,

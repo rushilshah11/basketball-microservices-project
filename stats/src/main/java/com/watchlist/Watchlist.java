@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,4 +26,12 @@ public class Watchlist {
 
     @Column(name = "user_id", nullable = false)
     private Integer userId;
+
+    // Track when player stats were last fetched
+    @Column(name = "last_stats_fetch")
+    private LocalDateTime lastStatsFetch;
+
+    // Track when player was added to watchlist
+    @Column(name = "added_at")
+    private LocalDateTime addedAt;
 }

@@ -28,6 +28,7 @@ public class PlayerService {
     private final NbaApiConfig nbaApiConfig;
 
     // --- 1. Search (Single) ---
+    @Cacheable(value = "player_info", key = "#name")
     public List<PlayerResponse> searchPlayersByName(String name) {
         log.info("Searching python sidecar for: {}", name);
 
