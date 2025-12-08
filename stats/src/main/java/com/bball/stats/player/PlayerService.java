@@ -18,6 +18,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,8 @@ public class PlayerService {
 
     // --- 1. Search (Single) ---
     @Cacheable(value = "player_info", key = "#name")
+    @CircuitBreaker(name = "nbaFetcher", fallbackMethod = "searchPlayersFallback")
+    @RateLimiter(name = "nbaFetcher")
     public List<PlayerResponse> searchPlayersByName(String name) {
         log.info("Searching python sidecar for: {}", name);
 
@@ -68,12 +72,22 @@ public class PlayerService {
                             .build()
             );
 
-        } catch (HttpClientErrorException.NotFound e) {
-            return Collections.emptyList();
         } catch (Exception e) {
-            log.error("Error communicating with nba-fetcher: {}", e.getMessage());
-            return Collections.emptyList();
+            throw e;
         }
+    }
+
+    /**
+     * FALLBACK for Search
+     * Triggered if:
+     * 1. Rate Limit Exceeded (Too many requests)
+     * 2. Circuit Breaker Open (Python service is down)
+     * 3. Unexpected Exception
+     */
+    public List<PlayerResponse> searchPlayersFallback(String name, Throwable t) {
+        log.warn("⚠️ Fallback active for search '{}': {}", name, t.getMessage());
+        // Return empty list so the frontend doesn't crash, just shows no results
+        return Collections.emptyList();
     }
 
     // --- 2. Batch Search (Trending) ---
@@ -105,6 +119,8 @@ public class PlayerService {
 
     // --- 3. Stats ---
     @Cacheable(value = "player_stats", key = "#name")
+    @CircuitBreaker(name = "nbaFetcher", fallbackMethod = "getStatsFallback")
+    @RateLimiter(name = "nbaFetcher")
     public PlayerStatsResponse getPlayerStats(String name) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(nbaApiConfig.getBaseUrl())
@@ -120,8 +136,15 @@ public class PlayerService {
         }
     }
 
+    public PlayerStatsResponse getStatsFallback(String name, Exception ex) {
+        log.warn("Could not fetch stats for {}. Returning null/empty.", name);
+        return null; // Or return cached data if you implemented a backup cache
+    }
+
     // --- 4. Game Log (With Limit) ---
     @Cacheable(value = "game_logs", key = "#name + '-' + #limit")
+    @CircuitBreaker(name = "nbaFetcher", fallbackMethod = "getPlayerGameLogFallback")
+    @RateLimiter(name = "nbaFetcher")
     public List<GameLogResponse> getPlayerGameLog(String name, int limit) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(nbaApiConfig.getBaseUrl())
@@ -142,6 +165,11 @@ public class PlayerService {
             log.error("Error fetching game log for {}: {}", name, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    public List<GameLogResponse> getGameLogFallback(String name, int limit, Throwable t) {
+        log.warn("⚠️ Fallback active for game log '{}': {}", name, t.getMessage());
+        return Collections.emptyList();
     }
 
     public PlayerResponse getPlayerById(Long playerId) {
