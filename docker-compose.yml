@@ -133,6 +133,20 @@ services:
     volumes:
       - redis_data:/data
 
+  # ------------------------------------------------------------------------
+  # 7. Prediction Service (PyTorch Neural Network)
+  # ------------------------------------------------------------------------
+  prediction:
+    build:
+      context: ./prediction
+    container_name: bball_prediction
+    ports:
+      - "5002:5002"
+    environment:
+      PYTHONUNBUFFERED: 1
+    networks:
+      - default
+
 volumes:
   postgres_security_data:
   postgres_stats_data:
