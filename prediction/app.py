@@ -6,6 +6,11 @@ import torch.nn as nn
 import numpy as np
 import logging
 
+import os
+import redis
+import threading
+import json
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("prediction-service")
@@ -142,9 +147,46 @@ def predict_performance(stats: PlayerStats, home_game: bool = True) -> tuple:
         logger.error(f"Prediction error: {e}")
         raise
 
+# 1. Setup Redis Connection
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+
+# 2. Define the Subscriber Logic
+def redis_listener():
+    pubsub = redis_client.pubsub()
+    pubsub.subscribe('watchlist-events')
+
+    logger.info(f"Listening for events on 'watchlist-events' at {REDIS_HOST}:{REDIS_PORT}...")
+
+    for message in pubsub.listen():
+        if message['type'] == 'message':
+            try:
+                data = json.loads(message['data'])
+                event_type = data.get('eventType')
+                player_name = data.get('playerName')
+
+                logger.info(f"Received Event: {event_type} for {player_name}")
+
+                if event_type == 'PLAYER_ADDED':
+                    # TODO: Trigger a prediction update or pre-cache the prediction here
+                    logger.info(f"Triggering background prediction for {player_name}")
+                    # You could call your predict logic here and save to DB
+
+            #         ASHWINNNNNNN, ADD THE LOGIC TO RUN PREDICTION MODEL AND STORE IN POSTGRES DB HEREEEEEEEE
+
+            except Exception as e:
+                logger.error(f"Error processing Redis message: {e}")
+
 # ============================================
 # API Endpoints
 # ============================================
+
+# 3. Start Listener in Background Thread on Startup
+@app.on_event("startup")
+async def startup_event():
+    listener_thread = threading.Thread(target=redis_listener, daemon=True)
+    listener_thread.start()
 
 @app.get("/health")
 def health_check():
