@@ -1,5 +1,7 @@
 package com.bball.stats.watchlist;
 
+import com.bball.stats.events.RedisEventPublisher;
+import com.bball.stats.events.WatchlistEvent;
 import com.bball.stats.player.PlayerService;
 import com.bball.stats.player.PlayerStatsResponse;
 import com.watchlist.Watchlist;
@@ -19,6 +21,7 @@ public class WatchlistService {
 
     private final WatchlistRepository repository;
     private final PlayerService playerService;
+    private final RedisEventPublisher eventPublisher;
 
     public List<WatchlistResponse> getUserWatchlist(Integer userId) {
         List<Watchlist> watchlists = repository.findByUserId(userId);
@@ -45,6 +48,17 @@ public class WatchlistService {
 
         Watchlist savedWatchlist = repository.save(watchlist);
 
+        // Publish event to Redis Pub/Sub
+        WatchlistEvent event = WatchlistEvent.builder()
+                .eventType("PLAYER_ADDED")
+                .userId(userId)
+                .playerName(playerName)
+                .timestamp(now)
+                .watchlistId(savedWatchlist.getId())
+                .build();
+        eventPublisher.publishWatchlistEvent(event);
+        log.info("Published PLAYER_ADDED event for user {} and player {}", userId, playerName);
+
         return mapToResponse(savedWatchlist, "Player added to watchlist successfully");
     }
 
@@ -53,7 +67,19 @@ public class WatchlistService {
         var watchlist = repository.findByUserIdAndPlayerName(userId, playerName)
                 .orElseThrow(() -> new IllegalArgumentException("Player not found in watchlist"));
 
+        Long watchlistId = watchlist.getId();
         repository.delete(watchlist);
+
+        // Publish event to Redis Pub/Sub
+        WatchlistEvent event = WatchlistEvent.builder()
+                .eventType("PLAYER_REMOVED")
+                .userId(userId)
+                .playerName(playerName)
+                .timestamp(LocalDateTime.now())
+                .watchlistId(watchlistId)
+                .build();
+        eventPublisher.publishWatchlistEvent(event);
+        log.info("Published PLAYER_REMOVED event for user {} and player {}", userId, playerName);
 
         return WatchlistResponse.builder()
                 .playerName(playerName)
