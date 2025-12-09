@@ -80,6 +80,7 @@ services:
       SPRING_DATASOURCE_USERNAME: user
       SPRING_DATASOURCE_PASSWORD: password
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
     depends_on:
       eureka-server:
         condition: service_started
@@ -105,6 +106,7 @@ services:
       NBA_API_BASE_URL: http://nba-fetcher:5000
       SPRING_DATA_REDIS_HOST: redis  # Matches the service name 'redis' below
       SPRING_DATA_REDIS_PORT: 6379
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
     depends_on:
       eureka-server:
         condition: service_started
@@ -149,6 +151,20 @@ services:
     networks:
       - default
 
+  # ------------------------------------------------------------------------
+  # 8. API Gateway
+  # ------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: bball_gateway
+    ports:
+      - "8080:8080"  # Expose ONLY this port to the world
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_started
 volumes:
   postgres_security_data:
   postgres_stats_data:

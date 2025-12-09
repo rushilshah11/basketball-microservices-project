@@ -1,10 +1,12 @@
+import asyncio
 from fastapi import FastAPI, HTTPException, Query
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo
 from pydantic import BaseModel
 from typing import List, Optional
 import logging
-import concurrent.futures  # NEW: For parallel execution
+import concurrent.futures
+import py_eureka_client.eureka_client as eureka_client
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +60,30 @@ def fetch_player_data_with_team(name: str):
     except Exception as e:
         logger.error(f"Error processing {name}: {e}")
         return None
+
+async def register_with_eureka():
+    """
+    Attempts to register with Eureka in a loop until successful.
+    This runs in the background so it doesn't crash the app on startup.
+    """
+    while True:
+        try:
+            logger.info("Attempting to register with Eureka...")
+            await eureka_client.init_async(
+                eureka_server="http://eureka-server:8761/eureka",
+                app_name="NBA-FETCHER",
+                instance_port=5000
+            )
+            logger.info("✅ Successfully registered with Eureka!")
+            break  # Exit loop on success
+        except Exception as e:
+            logger.warning(f"❌ Eureka not ready yet ({e}). Retrying in 5 seconds...")
+            await asyncio.sleep(5)
+
+@app.on_event("startup")
+async def startup_event():
+    # Schedule the registration to run in the background
+    asyncio.create_task(register_with_eureka())
 
 @app.get("/health")
 def health_check():

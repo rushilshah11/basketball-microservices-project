@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import logging
-
+import py_eureka_client.eureka_client as eureka_client
 import os
 import redis
 import threading
@@ -187,6 +187,12 @@ def redis_listener():
 async def startup_event():
     listener_thread = threading.Thread(target=redis_listener, daemon=True)
     listener_thread.start()
+
+    await eureka_client.init_async(
+        eureka_server="http://eureka-server:8761/eureka",
+        app_name="PREDICTION-SERVICE",
+        instance_port=5002
+    )
 
 @app.get("/health")
 def health_check():
