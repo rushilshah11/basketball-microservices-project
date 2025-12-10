@@ -8,11 +8,37 @@ import logging
 import concurrent.futures
 import py_eureka_client.eureka_client as eureka_client
 
+from opentelemetry import trace
+from opentelemetry.exporter.zipkin.json import ZipkinExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+# --- NEW: Configure Tracer ---
+resource = Resource(attributes={
+    SERVICE_NAME: "nba-fetcher"  # This name will show up in Zipkin
+})
+
+zipkin_exporter = ZipkinExporter(
+    endpoint="http://zipkin:9411/api/v2/spans"
+)
+
+provider = TracerProvider(resource=resource)
+processor = BatchSpanProcessor(zipkin_exporter)
+provider.add_span_processor(processor)
+trace.set_tracer_provider(provider)
+
+# Instrument outgoing HTTP calls (nba_api uses 'requests' under the hood)
+RequestsInstrumentor().instrument()
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nba-fetcher")
 
 app = FastAPI(title="NBA Fetcher Microservice")
+FastAPIInstrumentor.instrument_app(app)
 
 # --- Helper Functions ---
 def get_player_id_by_name(full_name: str):
