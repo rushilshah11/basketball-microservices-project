@@ -42,6 +42,26 @@ services:
       retries: 5
 
   # ------------------------------------------------------------------------
+  # 2b. Database for Prediction-Service
+  # ------------------------------------------------------------------------
+  db-prediction:
+    image: postgres:15-alpine
+    container_name: bball_db_prediction
+    environment:
+      POSTGRES_DB: bball-prediction
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5436:5432"               # Host Port 5436 -> Container Port 5432 (for DBeaver access)
+    volumes:
+      - postgres_prediction_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d bball-prediction"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------------
   # 3. Eureka Server (Service Discovery)
   # ------------------------------------------------------------------------
   eureka-server:
@@ -61,6 +81,8 @@ services:
       db-security:
         condition: service_healthy
       db-stats:
+        condition: service_healthy
+      db-prediction:
         condition: service_healthy
 
   # ------------------------------------------------------------------------
@@ -148,6 +170,15 @@ services:
       PYTHONUNBUFFERED: 1
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      DATABASE_URL: postgresql://user:password@db-prediction:5432/bball-prediction
+      STATS_SERVICE_URL: http://stats-service:8081
+    depends_on:
+      db-prediction:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      stats-service:
+        condition: service_started
     networks:
       - default
 
@@ -168,4 +199,5 @@ services:
 volumes:
   postgres_security_data:
   postgres_stats_data:
+  postgres_prediction_data:
   redis_data:
