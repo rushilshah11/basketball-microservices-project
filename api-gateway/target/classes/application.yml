@@ -44,3 +44,19 @@ eureka:
       defaultZone: http://eureka-server:8761/eureka/
   instance:
     hostname: localhost
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # Log 100% of requests for development
+  zipkin:
+    tracing:
+      endpoint: "http://zipkin:9411/api/v2/spans"
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus # Enable the /prometheus endpoint
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
