@@ -12,6 +12,33 @@ import threading
 import json
 from sqlalchemy.orm import Session
 
+from opentelemetry import trace
+from opentelemetry.exporter.zipkin.json import ZipkinExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+# Define the Service Name (Change to "nba-fetcher" for that service)
+resource = Resource(attributes={
+    SERVICE_NAME: "prediction-service"
+})
+
+# Set up the Zipkin Exporter
+zipkin_exporter = ZipkinExporter(
+    endpoint="http://zipkin:9411/api/v2/spans"
+)
+
+# Set up the Tracer Provider
+provider = TracerProvider(resource=resource)
+processor = BatchSpanProcessor(zipkin_exporter)
+provider.add_span_processor(processor)
+trace.set_tracer_provider(provider)
+
+# Instrument Requests (outgoing calls to Stats Service)
+RequestsInstrumentor().instrument()
+
 # Import our new modules
 from database import init_db, get_db, TrainingMetadata
 from cache import PredictionCache, test_redis_connection
@@ -25,6 +52,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("prediction-service")
 
 app = FastAPI(title="Basketball Prediction Service")
+FastAPIInstrumentor.instrument_app(app)
 
 # ============================================
 # Neural Network Model

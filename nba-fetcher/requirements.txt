@@ -4,3 +4,8 @@ nba_api==1.2.1
 pandas==2.1.4
 py_eureka_client==0.13.2
 asyncio==4.0.0
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-zipkin
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-requests
