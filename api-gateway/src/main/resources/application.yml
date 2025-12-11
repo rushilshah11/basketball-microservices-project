@@ -27,7 +27,7 @@ spring:
         - id: prediction-service
           uri: lb://PREDICTION-SERVICE
           predicates:
-            - Path=/predict/**
+            - Path=/predict/**, /predictions/**, /model/**, /training/**, /cache/**
 
         # 4. Route to NBA Fetcher (Internal use mostly, but good for debugging)
         # We strip the prefix so /nba/player/LeBron -> NBA-FETCHER/player/LeBron
