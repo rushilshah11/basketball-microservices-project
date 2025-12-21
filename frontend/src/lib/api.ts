@@ -34,6 +34,24 @@ export interface GameStats {
   [key: string]: any;
 }
 
+export interface PlayerStats {
+  pointsPerGame: number;
+  assistsPerGame: number;
+  reboundsPerGame: number;
+  fieldGoalPercentage: number;
+  threePointPercentage: number;
+  freeThrowPercentage: number;
+  gamesPlayed: number;
+}
+
+export interface GameLog {
+  date: string;
+  opponent: string;
+  points: number;
+  assists: number;
+  rebounds: number;
+}
+
 // Get auth token from cookies (client-side)
 export function getAuthToken(): string | null {
   if (typeof document === 'undefined') return null;
@@ -175,3 +193,45 @@ export async function getPrediction(playerName: string): Promise<Prediction> {
   return response.json();
 }
 
+export async function getTrendingPlayers(): Promise<Player[]> {
+  const token = getAuthToken();
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // Matches PlayerController.java @GetMapping("/trending")
+  const response = await fetch(`${API_BASE_URL}/api/players/trending`, {
+    headers,
+  });
+  if (!response.ok) throw new Error("Failed to fetch trending players");
+  return response.json();
+}
+
+export async function getPlayerStats(name: string): Promise<PlayerStats> {
+  const token = getAuthToken();
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // Matches PlayerController.java @GetMapping("/stats")
+  const response = await fetch(
+    `${API_BASE_URL}/api/players/stats?name=${encodeURIComponent(name)}`,
+    { headers }
+  );
+  if (!response.ok) throw new Error("Failed to fetch player stats");
+  return response.json();
+}
+
+export async function getPlayerGames(name: string): Promise<GameLog[]> {
+  const token = getAuthToken();
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // Matches PlayerController.java @GetMapping("/games")
+  const response = await fetch(
+    `${API_BASE_URL}/api/players/games?name=${encodeURIComponent(
+      name
+    )}&limit=5`,
+    { headers }
+  );
+  if (!response.ok) throw new Error("Failed to fetch game log");
+  return response.json();
+}

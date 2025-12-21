@@ -10,6 +10,16 @@ spring:
         locator:
           enabled: true # Allows finding services automatically
           lower-case-service-id: true
+      globalcors:
+        add-to-simple-url-handler-mapping: true # Required for OPTIONS requests to work
+        cors-configurations:
+          '[/**]': # Apply to all routes
+            allowedOrigins:
+              - "http://localhost:3000" # Allow your frontend
+              - "http://localhost:3001"
+            allowedMethods: "*" # Allow GET, POST, PUT, DELETE, etc.
+            allowedHeaders: "*" # Allow all headers (like Authorization)
+            allowCredentials: true # Allow cookies/tokens
       routes:
         # 1. Route to Security Service
         - id: security-service

@@ -2,90 +2,60 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useDebounce } from 'use-debounce';
-import { searchPlayers } from '@/lib/api';
-import { Player } from '@/lib/api';
+import { searchPlayers, getTrendingPlayers, Player } from '@/lib/api'; // Import getTrendingPlayers
 import SearchBar from './SearchBar';
 import PlayerCard from './PlayerCard';
 
-// Popular player search terms to fetch top players
-const POPULAR_PLAYERS_SEARCH_TERMS = [
-  'LeBron', 'Curry', 'Durant', 'Giannis', 'Luka', 
-  'Tatum', 'Embiid', 'Jokic', 'Booker', 'Lillard'
-];
-
 export default function StatsDashboard() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery] = useDebounce(searchQuery, 400);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTopPlayers, setShowTopPlayers] = useState(true);
   const [topPlayersLoaded, setTopPlayersLoaded] = useState(false);
+
+  // Use a ref to prevent state updates on unmounted component
   const mountedRef = useRef(true);
 
-  // Load top players on mount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // LOAD TOP PLAYERS (Efficiently)
   useEffect(() => {
     const loadTopPlayers = async () => {
       if (topPlayersLoaded) return;
-      
+
       try {
         setLoading(true);
-        const allPlayers: Player[] = [];
-        const seenIds = new Set<number>();
-
-        // Fetch multiple popular players and combine results
-        for (const term of POPULAR_PLAYERS_SEARCH_TERMS.slice(0, 5)) {
-          try {
-            const results = await searchPlayers(term);
-            if (results && Array.isArray(results)) {
-              // Add unique players only
-              results.forEach(player => {
-                if (player.id && !seenIds.has(player.id)) {
-                  seenIds.add(player.id);
-                  allPlayers.push(player);
-                }
-              });
-              // Stop if we have enough
-              if (allPlayers.length >= 10) break;
-            }
-          } catch (err) {
-            // Continue with next search term if one fails
-            console.warn(`Failed to search for ${term}:`, err);
-          }
-        }
+        // Call the backend endpoint dedicated to this list
+        const trending = await getTrendingPlayers();
 
         if (mountedRef.current) {
-          setPlayers(allPlayers.slice(0, 10));
+          setPlayers(trending);
           setTopPlayersLoaded(true);
         }
       } catch (error) {
-        console.error('Failed to load top players:', error);
-        if (mountedRef.current) {
-          setPlayers([]);
-        }
+        console.error("Failed to load top players:", error);
       } finally {
-        if (mountedRef.current) {
-          setLoading(false);
-        }
+        if (mountedRef.current) setLoading(false);
       }
     };
 
     loadTopPlayers();
-
-    return () => {
-      mountedRef.current = false;
-    };
   }, [topPlayersLoaded]);
 
-  // Handle search
+  // Handle search (Existing logic is fine, just ensure it toggles correctly)
   useEffect(() => {
     const performSearch = async () => {
       if (!debouncedQuery.trim()) {
-        // If search is cleared, show top players again
-        if (!topPlayersLoaded) {
-          setShowTopPlayers(true);
-          return;
+        if (topPlayersLoaded) {
+          // Re-fetch trending if we cleared search, or just rely on state if you persisted it
+          const trending = await getTrendingPlayers();
+          if (mountedRef.current) setPlayers(trending);
         }
-        // Reload top players if we had them before
         setShowTopPlayers(true);
         return;
       }
@@ -98,14 +68,10 @@ export default function StatsDashboard() {
           setPlayers(Array.isArray(results) ? results : []);
         }
       } catch (error) {
-        console.error('Search failed:', error);
-        if (mountedRef.current) {
-          setPlayers([]);
-        }
+        console.error("Search failed:", error);
+        if (mountedRef.current) setPlayers([]);
       } finally {
-        if (mountedRef.current) {
-          setLoading(false);
-        }
+        if (mountedRef.current) setLoading(false);
       }
     };
 

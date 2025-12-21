@@ -1,20 +1,24 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 15, 23, 42;
-  --background-end-rgb: 88, 28, 135;
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 15, 23, 42;
+    --background-end-rgb: 88, 28, 135;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
+    color: rgb(var(--foreground-rgb));
+    background: linear-gradient(
+            to bottom right,
+            rgb(var(--background-start-rgb)),
+            rgb(var(--background-end-rgb))
+    )
+    no-repeat fixed;
+    min-height: 100vh;
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+    .text-balance {
+        text-wrap: balance;
+    }
 }
-
