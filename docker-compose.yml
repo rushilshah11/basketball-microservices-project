@@ -230,6 +230,17 @@ services:
       - zipkin
     networks:
       - default
+  
+  frontend:
+    build:
+      context: ./frontend
+    container_name: bball_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080 
+    depends_on:
+      - api-gateway
 volumes:
   postgres_security_data:
   postgres_stats_data:
