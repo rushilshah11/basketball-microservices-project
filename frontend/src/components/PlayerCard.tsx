@@ -71,7 +71,7 @@ export default function PlayerCard({ player }: PlayerCardProps) {
     if (last5Games.length === 0) {
       setLoadingGames(true);
       try {
-        const games = await getPlayerGames(player.name);
+        const games = await getPlayerGames(player.fullName);
         setLast5Games(games);
       } catch (err) {
         console.error(err);
@@ -91,7 +91,7 @@ export default function PlayerCard({ player }: PlayerCardProps) {
     if (!seasonStats) {
       setLoadingStats(true);
       try {
-        const stats = await getPlayerStats(player.name);
+        const stats = await getPlayerStats(player.fullName);
         setSeasonStats(stats);
       } catch (err) {
         console.error(err);
@@ -106,11 +106,11 @@ export default function PlayerCard({ player }: PlayerCardProps) {
     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border-2 border-white/20 hover:border-orange-500/50 transition-all duration-300 shadow-lg hover:shadow-xl">
       {/* Player Header */}
       <div className="mb-4">
-        <h3 className="text-2xl font-bold text-white mb-1">{player.name}</h3>
+        <h3 className="text-2xl font-bold text-white mb-1">{player.fullName}</h3>
         <div className="flex items-center space-x-4 text-gray-300">
           <span className="flex items-center">
             <span className="mr-2">🏀</span>
-            {player.team || "N/A"}
+            {player.teamName || "N/A"}
           </span>
           {/* Add Position if available in your API response, otherwise optional */}
         </div>

@@ -13,6 +13,16 @@ export default function Navbar() {
 
   useEffect(() => {
     setAuthenticated(isAuthenticated());
+      // Event handler for custom auth-change event
+      const handleAuthChange = () => {
+          setAuthenticated(isAuthenticated());
+      };
+      // Listen for custom event
+      window.addEventListener('auth-change', handleAuthChange);
+      // Cleanup
+      return () => {
+          window.removeEventListener('auth-change', handleAuthChange);
+      };
   }, [pathname]);
 
   const handleLogout = async () => {
