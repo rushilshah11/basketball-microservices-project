@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # ------------------------------------------------------------------------
@@ -10,9 +10,9 @@ services:
     environment:
       POSTGRES_DB: bball-security
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: password  # DEVELOPMENT PASSWORD ONLY
+      POSTGRES_PASSWORD: password # DEVELOPMENT PASSWORD ONLY
     ports:
-      - "5435:5432"               # Host Port 5435 -> Container Port 5432 (for DBeaver access)
+      - "5435:5432" # Host Port 5435 -> Container Port 5432 (for DBeaver access)
     volumes:
       - postgres_security_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,7 +32,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
     ports:
-      - "5434:5432"               # Host Port 5434 -> Container Port 5432 (for DBeaver access)
+      - "5434:5432" # Host Port 5434 -> Container Port 5432 (for DBeaver access)
     volumes:
       - postgres_stats_data:/var/lib/postgresql/data
     healthcheck:
@@ -52,7 +52,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
     ports:
-      - "5436:5432"               # Host Port 5436 -> Container Port 5432 (for DBeaver access)
+      - "5436:5432" # Host Port 5436 -> Container Port 5432 (for DBeaver access)
     volumes:
       - postgres_prediction_data:/var/lib/postgresql/data
     healthcheck:
@@ -72,7 +72,7 @@ services:
         - JAR_FILE=target/eureka-server-0.0.1-SNAPSHOT.jar
     container_name: bball_eureka_server
     ports:
-      - "8761:8761"               # Expose Eureka dashboard
+      - "8761:8761" # Expose Eureka dashboard
     environment:
       # Use service name for inter-container communication
       EUREKA_INSTANCE_HOSTNAME: eureka-server
@@ -95,7 +95,7 @@ services:
         - JAR_FILE=target/security-0.0.1-SNAPSHOT.jar
     container_name: bball_security_service
     ports:
-      - "8082:8082"               # Expose Security API endpoint
+      - "8082:8082" # Expose Security API endpoint
     environment:
       # Link DB and Eureka using container service names
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-security:5432/bball-security
@@ -117,7 +117,7 @@ services:
         - JAR_FILE=target/stats-0.0.1-SNAPSHOT.jar
     container_name: bball_stats_service
     ports:
-      - "8081:8081"               # Expose Stats API endpoint
+      - "8081:8081" # Expose Stats API endpoint
     environment:
       # Link DB and Eureka using container service names
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-stats:5432/bball-stats
@@ -126,7 +126,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       # !!! IMPORTANT: Replace this with your actual RapidAPI Key
       NBA_API_BASE_URL: http://nba-fetcher:5000
-      SPRING_DATA_REDIS_HOST: redis  # Matches the service name 'redis' below
+      SPRING_DATA_REDIS_HOST: redis # Matches the service name 'redis' below
       SPRING_DATA_REDIS_PORT: 6379
       EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
     depends_on:
@@ -152,8 +152,8 @@ services:
   redis:
     image: redis:alpine
     container_name: bball_redis
-#    ports:
-#      - "6379:6379"
+    #    ports:
+    #      - "6379:6379"
     volumes:
       - redis_data:/data
 
@@ -190,7 +190,7 @@ services:
       context: ./api-gateway
     container_name: bball_gateway
     ports:
-      - "8080:8080"  # Expose ONLY this port to the world
+      - "8080:8080" # Expose ONLY this port to the world
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
     depends_on:
@@ -224,21 +224,23 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=password  # Login with admin/password
+      - GF_SECURITY_ADMIN_PASSWORD=password # Login with admin/password
     depends_on:
       - prometheus
       - zipkin
     networks:
       - default
-  
+
   frontend:
     build:
       context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
     container_name: bball_frontend
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080 
+      NEXT_PUBLIC_API_URL: http://localhost:8080
     depends_on:
       - api-gateway
 volumes:
