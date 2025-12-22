@@ -61,10 +61,10 @@ export default function TeamPage() {
       const playersWithPredictions = await Promise.all(
         playerDetails.map(async (player) => {
           try {
-            const prediction = await getPrediction(player.name);
+            const prediction = await getPrediction(player.fullName);
             return { ...player, prediction, loading: false };
           } catch (err) {
-            console.error(`Failed to get prediction for ${player.name}:`, err);
+            console.error(`Failed to get prediction for ${player.fullName}:`, err);
             return { ...player, loading: false };
           }
         })
@@ -146,9 +146,9 @@ function PlayerPredictionCard({ player }: { player: PlayerWithPrediction }) {
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border-2 border-white/20 hover:border-orange-500/50 transition-all duration-300 shadow-lg hover:shadow-xl">
       <div className="mb-4">
-        <h3 className="text-2xl font-bold text-white mb-1">{player.name}</h3>
+        <h3 className="text-2xl font-bold text-white mb-1">{player.fullName}</h3>
         <div className="flex items-center space-x-4 text-gray-300 text-sm">
-          <span>🏀 {player.team || 'N/A'}</span>
+          <span>🏀 {player.teamName || 'N/A'}</span>
           <span>📍 {player.position || 'N/A'}</span>
         </div>
       </div>
