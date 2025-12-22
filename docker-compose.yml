@@ -117,8 +117,8 @@ services:
     environment:
       # Link DB and Eureka using container service names
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-stats:5432/bball-stats
-      SPRING_DATASOURCE_USERNAME: user
-      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       # !!! IMPORTANT: Replace this with your actual RapidAPI Key
       NBA_API_BASE_URL: http://nba-fetcher:5000
@@ -166,7 +166,7 @@ services:
       PYTHONUNBUFFERED: 1
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      DATABASE_URL: postgresql://user:password@db-prediction:5432/bball-prediction
+      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@db-prediction:5432/bball-prediction
       STATS_SERVICE_URL: http://stats-service:8081
     depends_on:
       db-prediction:
