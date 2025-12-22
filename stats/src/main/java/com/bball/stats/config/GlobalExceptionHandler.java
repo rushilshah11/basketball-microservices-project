@@ -1,5 +1,7 @@
 package com.bball.stats.config;
 
+import com.bball.stats.util.AuditLogger;
+
 import com.bball.stats.exception.PlayerNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +16,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PlayerNotFoundException.class)
     public ResponseEntity<Map<String, String>> handlePlayerError(PlayerNotFoundException ex) {
         // Return 404 so the frontend knows it failed, but with our custom message
+        AuditLogger.info("not_found|service=stats|message=" + ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("message", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGenericError(Exception ex) {
+        AuditLogger.error("exception|service=stats|message=" + ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", "An unexpected error occurred. Please try again later."));
+            .body(Map.of("message", "An unexpected error occurred. Please try again later."));
     }
 }

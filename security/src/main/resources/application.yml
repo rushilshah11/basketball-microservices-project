@@ -30,6 +30,12 @@ eureka:
   instance:
     prefer-ip-address: true      # IMPORTANT: Use IP so Gateway can find it
 
+application:
+  security:
+    jwt:
+      secret-key: ${APPLICATION_SECURITY_JWT_SECRET_KEY}
+      expiration: ${APPLICATION_SECURITY_JWT_EXPIRATION:86400000}
+
 grpc:
   server:
     port: 9090

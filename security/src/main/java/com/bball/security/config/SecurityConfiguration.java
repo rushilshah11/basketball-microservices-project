@@ -24,7 +24,13 @@ public class SecurityConfiguration {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/authenticate", "/actuator/**").hasAuthority("ADMIN")
+                        // 1. Allow everyone to access Auth
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        // 2. Restrict Actuator to Admins only
+                        .requestMatchers("/actuator/**").hasAuthority("ADMIN")
+
+                        // 3. Lock everything else
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

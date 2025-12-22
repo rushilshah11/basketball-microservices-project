@@ -5,6 +5,7 @@ from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplay
 from pydantic import BaseModel
 from typing import List, Optional
 import logging
+from logging.handlers import RotatingFileHandler
 import concurrent.futures
 import py_eureka_client.eureka_client as eureka_client
 
@@ -36,6 +37,16 @@ RequestsInstrumentor().instrument()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nba-fetcher")
+# Audit logger
+import os
+os.makedirs("logs", exist_ok=True)
+audit_handler = RotatingFileHandler("logs/audit-nbafetcher.log", maxBytes=5_242_880, backupCount=5)
+audit_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+audit_handler.setFormatter(audit_formatter)
+audit_logger = logging.getLogger("audit")
+audit_logger.setLevel(logging.INFO)
+if not audit_logger.handlers:
+    audit_logger.addHandler(audit_handler)
 
 app = FastAPI(title="NBA Fetcher Microservice")
 FastAPIInstrumentor.instrument_app(app)
@@ -123,8 +134,13 @@ def health_check():
 @app.get("/player/{full_name}")
 def get_player(full_name: str):
     logger.info(f"Searching for player: {full_name}")
+    try:
+        audit_logger.info(f"request|service=nba-fetcher|path=/player|player={full_name}")
+    except Exception:
+        pass
     matches = players.find_players_by_full_name(full_name)
     if not matches:
+        audit_logger.info(f"not_found|service=nba-fetcher|player={full_name}")
         raise HTTPException(status_code=404, detail="Player not found")
 
     data = matches[0]
@@ -139,6 +155,10 @@ def get_player(full_name: str):
 @app.get("/players/search")
 def search_players_with_teams(query: str):
     logger.info(f"Searching for partial matches: {query}")
+    try:
+        audit_logger.info(f"request|service=nba-fetcher|path=/players/search|q={query}")
+    except Exception:
+        pass
     # 1. Find all matching players (regex based)
     matches = players.find_players_by_full_name(query)
     matches = [p for p in matches if p['is_active']]
@@ -167,6 +187,10 @@ class BatchRequest(BaseModel):
 
 @app.post("/players/batch")
 def get_players_batch(request: BatchRequest):
+    try:
+        audit_logger.info(f"request|service=nba-fetcher|path=/players/batch|count={len(request.names)}")
+    except Exception:
+        pass
     results = []
     # Use ThreadPoolExecutor to run API calls in parallel
     # This makes fetching 10 players take ~1 second instead of ~10 seconds
@@ -206,6 +230,7 @@ def get_player_team(full_name: str):
         }
     except Exception as e:
         logger.error(f"Error fetching team: {e}")
+        audit_logger.error(f"error|service=nba-fetcher|path=/player/{{full_name}}/team|error={e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # 4. Get Season Averages
@@ -250,6 +275,7 @@ def get_player_season_averages(full_name: str):
         }
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")
+        audit_logger.error(f"error|service=nba-fetcher|path=/player/{{full_name}}/stats|error={e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # 5. Get Last N Games
@@ -286,6 +312,7 @@ def get_player_game_log(full_name: str, limit: int = Query(5, ge=1, le=82)):
         return games
     except Exception as e:
         logger.error(f"Error fetching game log: {e}")
+        audit_logger.error(f"error|service=nba-fetcher|path=/player/{{full_name}}/games|error={e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == '__main__':

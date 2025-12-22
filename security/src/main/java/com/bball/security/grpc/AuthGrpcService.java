@@ -10,6 +10,7 @@ import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
+import org.springframework.data.redis.core.StringRedisTemplate; // <--- 1. IMPORT THIS
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
@@ -21,12 +22,12 @@ public class AuthGrpcService extends AuthServiceGrpc.AuthServiceImplBase {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
     private final UserRepository userRepository;
+    private final StringRedisTemplate redisTemplate; // <--- 2. INJECT REDIS
 
     @Override
     public void verifyToken(VerifyTokenRequest request, StreamObserver<VerifyTokenResponse> responseObserver) {
         String token = request.getToken();
 
-        // 1. Clean the token (remove "Bearer " if sent)
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
@@ -36,18 +37,25 @@ public class AuthGrpcService extends AuthServiceGrpc.AuthServiceImplBase {
         String email = "";
 
         try {
-            // 2. Check if token is valid using your existing JwtService
-            String username = jwtService.extractUsername(token);
-            if (username != null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                if (jwtService.isTokenValid(token, userDetails)) {
-                    // 3. If valid, find the user to get their ID
-                    User user = userRepository.findByEmail(username).orElse(null);
-                    if (user != null) {
-                        isValid = true;
-                        userId = String.valueOf(user.getId()); // Convert Integer ID to String for gRPC
-                        email = user.getEmail();
-                        log.debug("gRPC Verification Success: User {}", email);
+            // --- 3. ADD BLACKLIST CHECK HERE ---
+            if (Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + token))) {
+                log.warn("gRPC Verification Failed: Token is on blacklist");
+                // We leave isValid = false and return immediately
+            }
+            // -----------------------------------
+            else {
+                // proceed with normal signature check
+                String username = jwtService.extractUsername(token);
+                if (username != null) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    if (jwtService.isTokenValid(token, userDetails)) {
+                        User user = userRepository.findByEmail(username).orElse(null);
+                        if (user != null) {
+                            isValid = true;
+                            userId = String.valueOf(user.getId());
+                            email = user.getEmail();
+                            log.debug("gRPC Verification Success: User {}", email);
+                        }
                     }
                 }
             }
@@ -55,14 +63,12 @@ public class AuthGrpcService extends AuthServiceGrpc.AuthServiceImplBase {
             log.error("gRPC Token Verification Failed: {}", e.getMessage());
         }
 
-        // 4. Build the response object
         VerifyTokenResponse response = VerifyTokenResponse.newBuilder()
                 .setValid(isValid)
                 .setUserId(userId)
                 .setEmail(email)
                 .build();
 
-        // 5. Send response back to Stats Service
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

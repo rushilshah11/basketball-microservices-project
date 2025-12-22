@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import logging
+from logging.handlers import RotatingFileHandler
 import py_eureka_client.eureka_client as eureka_client
 import os
 import redis
@@ -53,11 +54,28 @@ from model_trainer import ModelTrainer
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("prediction-service")
 
+# Audit logger: write structured audit events to a rotating file for forensics
+os.makedirs("logs", exist_ok=True)
+audit_handler = RotatingFileHandler("logs/audit-prediction.log", maxBytes=5_242_880, backupCount=5)
+audit_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+audit_handler.setFormatter(audit_formatter)
+audit_logger = logging.getLogger("audit")
+audit_logger.setLevel(logging.INFO)
+if not audit_logger.handlers:
+    audit_logger.addHandler(audit_handler)
+
 app = FastAPI(title="Basketball Prediction Service")
 FastAPIInstrumentor.instrument_app(app)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    # Audit the exception with request context for forensic analysis
+    try:
+        ip = request.client.host if request.client else "unknown"
+        audit_logger.info(f"exception|service=prediction|ip={ip}|path={request.url.path}|error={str(exc)}")
+    except Exception:
+        audit_logger.info(f"exception|service=prediction|error={str(exc)}")
+
     return JSONResponse(
         status_code=500,
         content={"message": f"Prediction could not be made. System error: {str(exc)}"},
@@ -331,13 +349,16 @@ def health_check():
     }
 
 @app.post("/predict", response_model=PredictionResponse)
-def predict_player_performance(request: PredictionRequest):
+def predict_player_performance(http_request: Request, request: PredictionRequest):
     """
     Predict player performance for next game.
     """
     logger.info(f"Prediction request for: {request.playerName}")
-    
     try:
+        # Audit the incoming request (IP+path+player)
+        client_ip = http_request.client.host if http_request.client else "unknown"
+        audit_logger.info(f"request|service=prediction|ip={client_ip}|path=/predict|player={request.playerName}")
+
         predicted_pts, predicted_ast, predicted_reb, confidence = predict_performance(
             request.currentStats,
             request.homeGame
@@ -353,14 +374,23 @@ def predict_player_performance(request: PredictionRequest):
         
     except Exception as e:
         logger.error(f"Error predicting for {request.playerName}: {e}")
+        try:
+            audit_logger.error(f"error|service=prediction|player={request.playerName}|error={e}")
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/predict/batch")
-def predict_batch(request: BatchPredictionRequest):
+def predict_batch(http_request: Request, request: BatchPredictionRequest):
     """
     Batch prediction for multiple players.
     """
     logger.info(f"Batch prediction for {len(request.predictions)} players")
+    try:
+        client_ip = http_request.client.host if http_request.client else "unknown"
+        audit_logger.info(f"request|service=prediction|ip={client_ip}|path=/predict/batch|count={len(request.predictions)}")
+    except Exception:
+        audit_logger.info(f"request|service=prediction|count={len(request.predictions)}")
     
     results = []
     for pred_req in request.predictions:
@@ -379,6 +409,10 @@ def predict_batch(request: BatchPredictionRequest):
             ))
         except Exception as e:
             logger.error(f"Error in batch prediction for {pred_req.playerName}: {e}")
+            try:
+                audit_logger.error(f"error|service=prediction|player={pred_req.playerName}|error={e}")
+            except Exception:
+                pass
             # Continue with other predictions
             
     return results

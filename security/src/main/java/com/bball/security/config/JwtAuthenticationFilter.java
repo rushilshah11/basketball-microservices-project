@@ -18,6 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.io.IOException;
+import com.bball.security.util.AuditLogger;
 
 @Component
 @RequiredArgsConstructor
@@ -40,7 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try{
             final String authHeader = request.getHeader("Authorization");
             final String jwt;
-            final String userEmail;
+            String userEmail = null;
 
             if (authHeader == null  || !authHeader.startsWith("Bearer ")) {
                 filterChain.doFilter(request, response);
@@ -48,6 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             jwt  = authHeader.substring(7);
             if (Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + jwt))) {
+                AuditLogger.info("auth_failure|reason=blacklisted_token|user=" + userEmail);
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
                 response.getWriter().write("Token is logged out (blacklisted)");
                 return;
@@ -68,11 +70,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
             // CATCH THE ERROR HERE
+            AuditLogger.info("auth_failure|reason=expired_token|message=" + e.getMessage());
             response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
             response.getWriter().write("Token Expired");
             response.getWriter().flush();
         } catch (Exception e) {
             // Catch other JWT errors (malformed, etc)
+            AuditLogger.info("auth_failure|reason=invalid_token|message=" + e.getMessage());
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.getWriter().write("Invalid Token");
         }

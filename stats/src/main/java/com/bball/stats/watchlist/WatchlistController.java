@@ -1,6 +1,7 @@
 package com.bball.stats.watchlist;
 
 import com.bball.stats.auth.AuthGrpcClient;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +37,7 @@ public class WatchlistController {
     @PostMapping
     public ResponseEntity<WatchlistResponse> addPlayerToWatchlist(
             @RequestHeader("Authorization") String token,
-            @RequestBody WatchlistRequest request
+            @RequestBody @Valid WatchlistRequest request
     ) {
         Integer userId = authClient.verifyUser(token);
         try {
