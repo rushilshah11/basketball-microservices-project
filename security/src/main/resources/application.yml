@@ -11,8 +11,8 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/bball-security
     driver-class-name: org.postgresql.Driver
-    username: user
-    password: password
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
   jpa: 
     hibernate:
       ddl-auto: update

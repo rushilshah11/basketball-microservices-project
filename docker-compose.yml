@@ -8,11 +8,9 @@ services:
     image: postgres:15-alpine
     container_name: bball_db_security
     environment:
-      POSTGRES_DB: bball-security
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password # DEVELOPMENT PASSWORD ONLY
-    ports:
-      - "5435:5432" # Host Port 5435 -> Container Port 5432 (for DBeaver access)
+      POSTGRES_DB: ${DB_SECURITY_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD} # <--- Uses .env
     volumes:
       - postgres_security_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,11 +26,9 @@ services:
     image: postgres:15-alpine
     container_name: bball_db_stats
     environment:
-      POSTGRES_DB: bball-stats
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5434:5432" # Host Port 5434 -> Container Port 5432 (for DBeaver access)
+      POSTGRES_DB: ${DB_STATS_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD} # <--- Uses .env
     volumes:
       - postgres_stats_data:/var/lib/postgresql/data
     healthcheck:
@@ -48,11 +44,9 @@ services:
     image: postgres:15-alpine
     container_name: bball_db_prediction
     environment:
-      POSTGRES_DB: bball-prediction
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5436:5432" # Host Port 5436 -> Container Port 5432 (for DBeaver access)
+      POSTGRES_DB: ${DB_PREDICTION_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD} # <--- Uses .env
     volumes:
       - postgres_prediction_data:/var/lib/postgresql/data
     healthcheck:
@@ -71,8 +65,8 @@ services:
         # Reference the JAR file you just built
         - JAR_FILE=target/eureka-server-0.0.1-SNAPSHOT.jar
     container_name: bball_eureka_server
-    ports:
-      - "8761:8761" # Expose Eureka dashboard
+    expose:
+      - "8761" # Expose Eureka dashboard
     environment:
       # Use service name for inter-container communication
       EUREKA_INSTANCE_HOSTNAME: eureka-server
@@ -94,13 +88,15 @@ services:
       args:
         - JAR_FILE=target/security-0.0.1-SNAPSHOT.jar
     container_name: bball_security_service
-    ports:
-      - "8082:8082" # Expose Security API endpoint
+    expose:
+      - "8082" # Expose Security API endpoint
     environment:
       # Link DB and Eureka using container service names
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-security:5432/bball-security
-      SPRING_DATASOURCE_USERNAME: user
-      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      APPLICATION_SECURITY_JWT_SECRET_KEY: ${JWT_SECRET} # <--- CRITICAL
+      APPLICATION_SECURITY_JWT_EXPIRATION: ${JWT_EXPIRATION}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
     depends_on:
@@ -116,8 +112,8 @@ services:
       args:
         - JAR_FILE=target/stats-0.0.1-SNAPSHOT.jar
     container_name: bball_stats_service
-    ports:
-      - "8081:8081" # Expose Stats API endpoint
+    expose:
+      - "8081" # Expose Stats API endpoint
     environment:
       # Link DB and Eureka using container service names
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-stats:5432/bball-stats
@@ -144,8 +140,8 @@ services:
     build:
       context: ./nba-fetcher
     container_name: bball_nba_fetcher
-    ports:
-      - "5001:5000" # Expose port 5001
+    expose:
+      - "5001" # Expose port 5001
     networks:
       - default
 
@@ -164,8 +160,8 @@ services:
     build:
       context: ./prediction
     container_name: bball_prediction
-    ports:
-      - "5002:5002"
+    expose:
+      - "5002"
     environment:
       PYTHONUNBUFFERED: 1
       REDIS_HOST: redis
@@ -210,8 +206,8 @@ services:
   prometheus:
     image: prom/prometheus
     container_name: bball_prometheus
-    ports:
-      - "9090:9090"
+    expose:
+      - "9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
