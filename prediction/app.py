@@ -390,38 +390,45 @@ def model_info():
         "futureEnhancements": ["GNN", "Attention Mechanism", "Player Embeddings"]
     }
 
-@app.get("/predictions/{player_name}")
+@app.get("/predictions/{player_name}", response_model=PredictionResponse)
 async def get_player_prediction(player_name: str, db: Session = Depends(get_db)):
     """
     Get stored prediction for a player (from cache or database)
     If not found, generates a new prediction
     """
     logger.info(f"📊 Fetching prediction for: {player_name}")
-    
+
     try:
         # Try to get stored prediction
-        prediction = prediction_service.get_stored_prediction(player_name, db)
-        
-        if prediction:
-            logger.info(f"✅ Found stored prediction for {player_name}")
-            return prediction
-        
-        # If not found, generate new prediction
-        logger.info(f"🔄 Generating new prediction for {player_name}")
-        prediction = await prediction_service.generate_prediction_for_player(
-            player_name=player_name,
-            db=db,
-            force_refresh=False
-        )
-        
-        if prediction:
-            return prediction
+        prediction_data = prediction_service.get_stored_prediction(player_name, db)
+
+        if not prediction_data:
+            # If not found, generate new prediction
+            logger.info(f"🔄 Generating new prediction for {player_name}")
+            prediction_data = await prediction_service.generate_prediction_for_player(
+                player_name=player_name,
+                db=db,
+                force_refresh=False
+            )
+
+        if prediction_data:
+            logger.info(f"✅ Found/Generated prediction for {player_name}")
+
+            # 2. FIX: Map the nested dictionary to the flat PredictionResponse model
+            return PredictionResponse(
+                playerName=prediction_data["player_name"],
+                predictedPoints=prediction_data["predicted_stats"]["pts"],
+                predictedAssists=prediction_data["predicted_stats"]["ast"],
+                predictedRebounds=prediction_data["predicted_stats"]["reb"],
+                confidence=prediction_data["confidence"],
+                model="basic_nn"
+            )
         else:
             raise HTTPException(
                 status_code=404,
                 detail=f"Could not generate prediction for {player_name}. Stats may be unavailable."
             )
-    
+
     except Exception as e:
         logger.error(f"Error fetching prediction for {player_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

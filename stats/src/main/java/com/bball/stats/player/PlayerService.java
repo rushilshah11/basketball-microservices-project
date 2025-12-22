@@ -61,6 +61,7 @@ public class PlayerService {
                     .id(dto.getId())
                     .fullName(dto.getFullName())
                     .teamName(dto.getTeamName() != null ? dto.getTeamName() : "Unknown") // Handle null team
+                    .position(dto.getPosition())
                     .build()
             ).toList();
 

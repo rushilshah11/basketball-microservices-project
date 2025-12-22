@@ -10,4 +10,5 @@ public class NbaPlayerDto {
     private String lastName;
     private boolean isActive;
     private String teamName;
+    private String position;
 }

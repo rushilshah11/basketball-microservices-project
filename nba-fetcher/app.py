@@ -63,10 +63,13 @@ def fetch_player_data_with_team(name: str):
         # Fetch Team Info
         # This is the slow part, so we run it in parallel threads
         team_name = "Free Agent"
+        position = "N/A"
         try:
             info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
             df = info.get_data_frames()[0]
             if not df.empty:
+                if 'POSITION' in df.columns:
+                    position = str(df.iloc[0]['POSITION'])
                 city = str(df.iloc[0]['TEAM_CITY'])
                 nickname = str(df.iloc[0]['TEAM_NAME'])
                 # Combine city + name (e.g., "Los Angeles Lakers")

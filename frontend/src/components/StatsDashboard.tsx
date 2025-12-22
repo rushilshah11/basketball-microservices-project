@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useDebounce } from 'use-debounce';
-import { searchPlayers, getTrendingPlayers, Player } from '@/lib/api'; // Import getTrendingPlayers
+import { searchPlayers, getTrendingPlayers, getWatchlist, Player } from '@/lib/api'; // Import getTrendingPlayers
 import SearchBar from './SearchBar';
 import PlayerCard from './PlayerCard';
 
@@ -13,6 +13,7 @@ export default function StatsDashboard() {
   const [loading, setLoading] = useState(true);
   const [showTopPlayers, setShowTopPlayers] = useState(true);
   const [topPlayersLoaded, setTopPlayersLoaded] = useState(false);
+  const [watchlistSet, setWatchlistSet] = useState<Set<string>>(new Set());
 
   // Use a ref to prevent state updates on unmounted component
   const mountedRef = useRef(true);
@@ -46,6 +47,13 @@ export default function StatsDashboard() {
 
     loadTopPlayers();
   }, [topPlayersLoaded]);
+
+  useEffect(() => {
+      getWatchlist(1).then(items => {
+          const names = new Set(items.map((i: any) => i.playerName));
+          setWatchlistSet(names);
+      });
+    }, []);
 
   // Handle search (Existing logic is fine, just ensure it toggles correctly)
   useEffect(() => {
@@ -126,7 +134,7 @@ export default function StatsDashboard() {
           {players.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
               {players.map((player) => (
-                <PlayerCard key={player.id} player={player} />
+                <PlayerCard key={player.id} player={player} initialIsWatchlisted={watchlistSet.has(player.fullName)}/>
               ))}
             </div>
           ) : (

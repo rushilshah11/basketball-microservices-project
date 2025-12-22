@@ -14,11 +14,12 @@ import {
 
 interface PlayerCardProps {
   player: Player;
+  initialIsWatchlisted?: boolean;
 }
 
-export default function PlayerCard({ player }: PlayerCardProps) {
-  const [isInWatchlist, setIsInWatchlist] = useState(false);
+export default function PlayerCard({ player, initialIsWatchlisted = false }: PlayerCardProps) {
   const [loading, setLoading] = useState(false);
+  const [isInWatchlist, setIsInWatchlist] = useState(initialIsWatchlisted);
 
   // Data States
   const [last5Games, setLast5Games] = useState<GameLog[]>([]);
@@ -29,19 +30,6 @@ export default function PlayerCard({ player }: PlayerCardProps) {
   const [showSeasonStats, setShowSeasonStats] = useState(false);
   const [loadingGames, setLoadingGames] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
-
-  // ... (Keep your existing useEffect for checkWatchlist) ...
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const status = await checkWatchlist(player.fullName);
-        setIsInWatchlist(status);
-      } catch (error) {
-        console.error("Failed to check watchlist status:", error);
-      }
-    };
-    checkStatus();
-  }, [player.fullName]);
 
   // ... (Keep your existing handleWatchlistToggle) ...
   const handleWatchlistToggle = async () => {

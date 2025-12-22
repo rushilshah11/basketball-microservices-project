@@ -55,20 +55,19 @@ export default function TeamPage() {
           return;
       }
       // Step 3: Fetch player details
-      const playerDetails: Player[] = await getPlayersBatch(playerNames);
+        const [playerDetails, predictionsResults] = await Promise.all([
+            getPlayersBatch(playerNames),
+            // Fetch all predictions in parallel
+            Promise.all(
+                playerNames.map(name => getPrediction(name).catch(() => undefined))
+            )
+        ]);
 
       // Step 4: Fetch predictions for each player
-      const playersWithPredictions = await Promise.all(
-        playerDetails.map(async (player) => {
-          try {
-            const prediction = await getPrediction(player.fullName);
+        const playersWithPredictions = playerDetails.map(player => {
+            const prediction = predictionsResults.find(p => p?.playerName === player.fullName);
             return { ...player, prediction, loading: false };
-          } catch (err) {
-            console.error(`Failed to get prediction for ${player.fullName}:`, err);
-            return { ...player, loading: false };
-          }
-        })
-      );
+        });
 
       setPlayers(playersWithPredictions);
     } catch (err) {
@@ -148,8 +147,8 @@ function PlayerPredictionCard({ player }: { player: PlayerWithPrediction }) {
       <div className="mb-4">
         <h3 className="text-2xl font-bold text-white mb-1">{player.fullName}</h3>
         <div className="flex items-center space-x-4 text-gray-300 text-sm">
-          <span>🏀 {player.teamName || 'N/A'}</span>
-          <span>📍 {player.position || 'N/A'}</span>
+          <span>📍 {player.teamName || 'Free Agent'}</span>
+          <span>🏀 {player.position || 'N/A'}</span>
         </div>
       </div>
 

@@ -16,5 +16,6 @@ public class PlayerResponse implements Serializable {
     private Long id;
     private String fullName;
     private String teamName;
+    private String position;
 }
 
