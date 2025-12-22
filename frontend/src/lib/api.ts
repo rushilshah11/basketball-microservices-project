@@ -1,5 +1,5 @@
 // API Service Functions
-
+import { redirect } from 'next/navigation';
 // Configuration
 const SERVER_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const CLIENT_PROXY_URL = '/api/proxy';
@@ -20,7 +20,8 @@ export interface Player {
 
 export interface WatchlistItem {
     id: number;
-    playerId: number;
+    playerName: string
+    // playerId: number;
     userId: number;
 }
 
@@ -96,6 +97,18 @@ async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise
         headers,
     });
 
+    if (response.status === 403) {
+        if (isServer) {
+            // Server-side redirect (throws an internal error to handle navigation)
+            redirect('/login');
+        } else {
+            // Client-side redirect
+            window.location.href = '/login';
+            // Return a dummy value to satisfy TypeScript while the page redirects
+            return null as T;
+        }
+    }
+
     if (!response.ok) {
         let errorMessage = `API request failed: ${response.statusText}`;
         try {
@@ -117,9 +130,15 @@ async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise
 
 export async function register(name: string, email: string, password: string): Promise<AuthResponse> {
     // Endpoint: /api/v1/auth/register
+    // Split full name into first and last name
+    const [firstname, ...lastnameParts] = name.split(' ');
+    const lastname = lastnameParts.join(' ') || ''; // Handle case where no last name is provided
+
+    // Endpoint: /api/v1/auth/register
     return fetchAPI<AuthResponse>('v1/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ name, email, password }),
+        // Update the JSON body to match RegisterRequest.java
+        body: JSON.stringify({ firstname, lastname, email, password }),
     });
 }
 
@@ -138,9 +157,12 @@ export async function searchPlayers(name: string): Promise<Player[]> {
     return fetchAPI<Player[]>(`players/search?name=${encodeURIComponent(name)}`);
 }
 
-export async function getPlayersBatch(playerIds: number[]): Promise<Player[]> {
+export async function getPlayersBatch(names: string[]): Promise<Player[]> {
     // Endpoint: /api/players/batch
-    return fetchAPI<Player[]>(`players/batch?playerIds=${playerIds.join(',')}`);
+    return fetchAPI<Player[]>('players/batch', {
+        method: 'POST',
+        body: JSON.stringify(names)
+    });
 }
 
 export async function getTrendingPlayers(): Promise<Player[]> {
@@ -160,25 +182,29 @@ export async function getPlayerGames(name: string): Promise<GameLog[]> {
 
 // --- Watchlist API ---
 
-export async function addToWatchlist(playerId: number, userId: number = 1): Promise<void> {
+// CHANGE: Accept string playerName instead of number id
+export async function addToWatchlist(playerName: string, userId: number = 1): Promise<void> {
     // Endpoint: /api/watchlists
-    await fetchAPI('watchlists?userId=' + userId, {
+    await fetchAPI('watchlists', {
         method: 'POST',
-        body: JSON.stringify({ playerId }),
+        body: JSON.stringify({ playerName }), // Send object with playerName
     });
 }
 
-export async function removeFromWatchlist(playerId: number, userId: number = 1): Promise<void> {
-    // Endpoint: /api/watchlists/{id}
-    await fetchAPI(`watchlists/${playerId}?userId=${userId}`, {
+// CHANGE: Accept string playerName
+export async function removeFromWatchlist(playerName: string, userId: number = 1): Promise<void> {
+    // Endpoint: /api/watchlists/{name}
+    await fetchAPI(`watchlists/${encodeURIComponent(playerName)}`, {
         method: 'DELETE',
     });
 }
 
-export async function checkWatchlist(playerId: number, userId: number = 1): Promise<boolean> {
+// CHANGE: Accept string playerName
+export async function checkWatchlist(playerName: string, userId: number = 1): Promise<boolean> {
     try {
-        const data = await fetchAPI<any>(`watchlists/check/${playerId}?userId=${userId}`);
-        return data.isInWatchlist === true || data === true;
+        // Endpoint: /api/watchlists/check/{name}
+        const data = await fetchAPI<any>(`watchlists/check/${encodeURIComponent(playerName)}`);
+        return data.message === "Player is in watchlist";
     } catch {
         return false;
     }

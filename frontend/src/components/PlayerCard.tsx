@@ -34,24 +34,24 @@ export default function PlayerCard({ player }: PlayerCardProps) {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const status = await checkWatchlist(player.id);
+        const status = await checkWatchlist(player.fullName);
         setIsInWatchlist(status);
       } catch (error) {
         console.error("Failed to check watchlist status:", error);
       }
     };
     checkStatus();
-  }, [player.id]);
+  }, [player.fullName]);
 
   // ... (Keep your existing handleWatchlistToggle) ...
   const handleWatchlistToggle = async () => {
     setLoading(true);
     try {
       if (isInWatchlist) {
-        await removeFromWatchlist(player.id);
+        await removeFromWatchlist(player.fullName);
         setIsInWatchlist(false);
       } else {
-        await addToWatchlist(player.id);
+        await addToWatchlist(player.fullName);
         setIsInWatchlist(true);
       }
     } catch (error) {

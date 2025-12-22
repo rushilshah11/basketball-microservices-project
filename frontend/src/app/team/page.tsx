@@ -46,13 +46,16 @@ export default function TeamPage() {
         return;
       }
 
-      // Step 2: Extract player IDs (handle both WatchlistItem[] and number[] formats)
-      const playerIds = watchlist.map((item) => 
-        typeof item === 'number' ? item : item.playerId
-      ).filter((id): id is number => typeof id === 'number' && id > 0);
+      const playerNames = watchlist.map((item) => item.playerName)
+            .filter((name): name is string => typeof name === 'string' && name.length > 0);
 
+      if (playerNames.length === 0) {
+          setPlayers([]);
+          setLoading(false);
+          return;
+      }
       // Step 3: Fetch player details
-      const playerDetails: Player[] = await getPlayersBatch(playerIds);
+      const playerDetails: Player[] = await getPlayersBatch(playerNames);
 
       // Step 4: Fetch predictions for each player
       const playersWithPredictions = await Promise.all(

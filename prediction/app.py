@@ -11,6 +11,7 @@ import redis
 import threading
 import json
 from sqlalchemy.orm import Session
+import asyncio
 
 from opentelemetry import trace
 from opentelemetry.exporter.zipkin.json import ZipkinExporter
@@ -256,6 +257,25 @@ def redis_listener():
 # API Endpoints
 # ============================================
 
+# Add this helper function (copied from your nba-fetcher)
+async def register_with_eureka():
+    """
+    Attempts to register with Eureka in a loop until successful.
+    """
+    while True:
+        try:
+            logger.info("Attempting to register with Eureka...")
+            await eureka_client.init_async(
+                eureka_server="http://eureka-server:8761/eureka",
+                app_name="PREDICTION-SERVICE",
+                instance_port=5002 # Make sure this matches your service port
+            )
+            logger.info("✅ Successfully registered with Eureka!")
+            break  # Exit loop on success
+        except Exception as e:
+            logger.warning(f"❌ Eureka not ready yet ({e}). Retrying in 5 seconds...")
+            await asyncio.sleep(5)
+
 # 3. Start Listener in Background Thread on Startup
 @app.on_event("startup")
 async def startup_event():
@@ -282,11 +302,8 @@ async def startup_event():
     logger.info("✅ Redis listener started")
 
     # Register with Eureka
-    await eureka_client.init_async(
-        eureka_server="http://eureka-server:8761/eureka",
-        app_name="PREDICTION-SERVICE",
-        instance_port=5002
-    )
+    # This prevents the container from crashing if Eureka is slow
+    asyncio.create_task(register_with_eureka())
     logger.info("✅ Registered with Eureka")
 
 @app.on_event("shutdown")

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const SPRING_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const SPRING_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api-gateway:8080';
 
 async function handler(
     req: NextRequest,
@@ -29,10 +29,12 @@ async function handler(
 
     try {
         // 4. Forward the request to Spring Boot
+        const body = req.method !== "GET" ? await req.text() : undefined;
+
         const response = await fetch(`${SPRING_API_URL}/api/${path}${query}`, {
             method: req.method,
             headers: headers,
-            body: req.method !== 'GET' ? req.body : undefined,
+            body,
             // @ts-ignore
             duplex: 'half',
         });

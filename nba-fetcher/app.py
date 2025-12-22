@@ -132,6 +132,31 @@ def get_player(full_name: str):
         "isActive": data['is_active']
     }
 
+@app.get("/players/search")
+def search_players_with_teams(query: str):
+    logger.info(f"Searching for partial matches: {query}")
+    # 1. Find all matching players (regex based)
+    matches = players.find_players_by_full_name(query)
+    matches = [p for p in matches if p['is_active']]
+
+    # 2. Limit to top 5 matches to keep it fast
+    top_matches = matches[:5]
+
+    results = []
+    # 3. Fetch team data for all 5 in parallel (reusing your existing helper)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_name = {
+            executor.submit(fetch_player_data_with_team, p['full_name']): p['full_name']
+            for p in top_matches
+        }
+
+        for future in concurrent.futures.as_completed(future_to_name):
+            data = future.result()
+            if data:
+                results.append(data)
+
+    return results
+
 # 2. Batch Endpoint (UPDATED with Parallel Execution)
 class BatchRequest(BaseModel):
     names: List[str]
@@ -197,14 +222,27 @@ def get_player_season_averages(full_name: str):
         games = int(latest['GP'])
 
         if games == 0:
-            return {"season": str(latest['SEASON_ID']), "gamesPlayed": 0, "ppg": 0.0, "apg": 0.0, "rpg": 0.0}
+            return {
+                "season": str(latest['SEASON_ID']),
+                "gamesPlayed": 0,
+                "pointsPerGame": 0.0,
+                "assistsPerGame": 0.0,
+                "reboundsPerGame": 0.0,
+                "fieldGoalPercentage": 0.0,
+                "threePointPercentage": 0.0,
+                "freeThrowPercentage": 0.0
+            }
 
+        # UPDATED: Changed keys to match Frontend & Added Percentages (x100 for display)
         return {
             "season": str(latest['SEASON_ID']),
             "gamesPlayed": games,
-            "ppg": round(float(latest['PTS']) / games, 1),
-            "apg": round(float(latest['AST']) / games, 1),
-            "rpg": round(float(latest['REB']) / games, 1)
+            "pointsPerGame": round(float(latest['PTS']) / games, 1),
+            "assistsPerGame": round(float(latest['AST']) / games, 1),
+            "reboundsPerGame": round(float(latest['REB']) / games, 1),
+            "fieldGoalPercentage": round(float(latest['FG_PCT']) * 100, 1),
+            "threePointPercentage": round(float(latest['FG3_PCT']) * 100, 1),
+            "freeThrowPercentage": round(float(latest['FT_PCT']) * 100, 1)
         }
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")

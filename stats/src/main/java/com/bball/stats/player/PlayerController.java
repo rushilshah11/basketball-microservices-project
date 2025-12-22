@@ -30,6 +30,11 @@ public class PlayerController {
         return ResponseEntity.ok(playerService.getPlayerStats(name));
     }
 
+    @PostMapping("/batch")
+    public ResponseEntity<List<PlayerResponse>> getPlayersBatch(@RequestBody List<String> names) {
+        return ResponseEntity.ok(playerService.searchPlayersBatch(names));
+    }
+
     // UPDATED: Use Batch Search
     @GetMapping("/trending")
     public ResponseEntity<List<PlayerResponse>> getTrendingPlayers() {

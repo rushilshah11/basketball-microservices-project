@@ -30,49 +30,42 @@ public class PlayerService {
     private final NbaApiConfig nbaApiConfig;
 
     // --- 1. Search (Single) ---
-    @Cacheable(value = "player_info", key = "#name")
+    @Cacheable(value = "player_info", key = "#name", unless = "#result.isEmpty()")
     @CircuitBreaker(name = "nbaFetcher", fallbackMethod = "searchPlayersFallback")
     @RateLimiter(name = "nbaFetcher")
     public List<PlayerResponse> searchPlayersByName(String name) {
         log.info("Searching python sidecar for: {}", name);
 
-        // Fix: Use UriComponentsBuilder to encode "LeBron James" -> "LeBron%20James"
-        String playerUrl = UriComponentsBuilder
+        // Call the NEW /players/search endpoint
+        String searchUrl = UriComponentsBuilder
                 .fromHttpUrl(nbaApiConfig.getBaseUrl())
-                .path("/player/{name}")
-                .buildAndExpand(name)
+                .path("/players/search")
+                .queryParam("query", name)
+                .build()
                 .toUriString();
 
         try {
-            NbaPlayerDto player = restTemplate.getForObject(playerUrl, NbaPlayerDto.class);
-            if (player == null) return Collections.emptyList();
-
-            // Fetch Team
-            String teamUrl = UriComponentsBuilder
-                    .fromHttpUrl(nbaApiConfig.getBaseUrl())
-                    .path("/player/{name}/team")
-                    .buildAndExpand(name)
-                    .toUriString();
-
-            String teamName = "Unknown";
-            try {
-                NbaTeamDto team = restTemplate.getForObject(teamUrl, NbaTeamDto.class);
-                if (team != null) {
-                    teamName = team.getTeamCity() + " " + team.getTeamName();
-                }
-            } catch (Exception e) {
-                log.warn("Could not fetch team for player: {}", name);
-            }
-
-            return Collections.singletonList(
-                    PlayerResponse.builder()
-                            .id(player.getId())
-                            .fullName(player.getFullName())
-                            .teamName(teamName)
-                            .build()
+            // Expect a LIST of players now
+            ResponseEntity<List<NbaPlayerDto>> response = restTemplate.exchange(
+                    searchUrl,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<NbaPlayerDto>>() {}
             );
 
+            List<NbaPlayerDto> dtos = response.getBody();
+            if (dtos == null || dtos.isEmpty()) return Collections.emptyList();
+
+            // Map DTOs to PlayerResponse
+            return dtos.stream().map(dto -> PlayerResponse.builder()
+                    .id(dto.getId())
+                    .fullName(dto.getFullName())
+                    .teamName(dto.getTeamName() != null ? dto.getTeamName() : "Unknown") // Handle null team
+                    .build()
+            ).toList();
+
         } catch (Exception e) {
+            log.error("Search failed for {}: {}", name, e.getMessage());
             throw e;
         }
     }

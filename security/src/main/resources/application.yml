@@ -22,12 +22,9 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
-    register-with-eureka: true
-    fetch-registry: true
+      defaultZone: http://eureka-server:8761/eureka/ # Better default for Docker
   instance:
-    hostname: localhost
-    prefer-ip-address: false
+    prefer-ip-address: true      # IMPORTANT: Use IP so Gateway can find it
 
 grpc:
   server:

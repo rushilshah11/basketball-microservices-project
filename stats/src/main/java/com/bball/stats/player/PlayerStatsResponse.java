@@ -16,8 +16,13 @@ public class PlayerStatsResponse implements Serializable {
     private String season;
     private Integer gamesPlayed;
 
-    // Using Double for averages to handle decimal points (e.g. 25.7)
-    private Double ppg;      // Points Per Game
-    private Double apg;      // Assists Per Game
-    private Double rpg;      // Rebounds Per Game
+    // UPDATED: Renamed fields to match Python JSON & Frontend expectations
+    private Double pointsPerGame;
+    private Double assistsPerGame;
+    private Double reboundsPerGame;
+
+    // NEW: Added percentage fields
+    private Double fieldGoalPercentage;
+    private Double threePointPercentage;
+    private Double freeThrowPercentage;
 }
