@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Response, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import torch
@@ -54,6 +55,13 @@ logger = logging.getLogger("prediction-service")
 
 app = FastAPI(title="Basketball Prediction Service")
 FastAPIInstrumentor.instrument_app(app)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"message": f"Prediction could not be made. System error: {str(exc)}"},
+    )
 
 # ============================================
 # Neural Network Model

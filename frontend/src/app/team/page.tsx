@@ -147,8 +147,8 @@ function PlayerPredictionCard({ player }: { player: PlayerWithPrediction }) {
       <div className="mb-4">
         <h3 className="text-2xl font-bold text-white mb-1">{player.fullName}</h3>
         <div className="flex items-center space-x-4 text-gray-300 text-sm">
-          <span>📍 {player.teamName || 'Free Agent'}</span>
-          <span>🏀 {player.position || 'N/A'}</span>
+          <span>🏀 {player.teamName || 'Free Agent'}</span>
+          <span>👤 {player.position || 'N/A'}</span>
         </div>
       </div>
 

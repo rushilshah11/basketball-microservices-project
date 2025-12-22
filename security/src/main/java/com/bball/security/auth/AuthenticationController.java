@@ -1,5 +1,6 @@
 package com.bball.security.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,8 +32,8 @@ public class AuthenticationController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<LogoutResponse> logout() {
-        return ResponseEntity.ok(service.logout());
+    public ResponseEntity<LogoutResponse> logout(HttpServletRequest request) {
+        return ResponseEntity.ok(service.logout(request));
     }
 
 //

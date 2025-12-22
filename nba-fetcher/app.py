@@ -84,7 +84,8 @@ def fetch_player_data_with_team(name: str):
         return {
             "id": player_id,
             "fullName": data['full_name'],
-            "teamName": team_name
+            "teamName": team_name,
+            "position": position
         }
     except Exception as e:
         logger.error(f"Error processing {name}: {e}")

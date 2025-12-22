@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.io.IOException;
 
@@ -24,6 +25,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final StringRedisTemplate redisTemplate;
+    @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) throws ServletException {
+        return request.getServletPath().contains("/api/v1/auth");
+    }
 
     @Override
     protected void doFilterInternal(
@@ -41,6 +47,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             jwt  = authHeader.substring(7);
+            if (Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + jwt))) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+                response.getWriter().write("Token is logged out (blacklisted)");
+                return;
+            }
+
             userEmail = jwtService.extractUsername(jwt);
 
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {

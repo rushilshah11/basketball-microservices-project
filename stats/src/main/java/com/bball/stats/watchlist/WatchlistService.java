@@ -7,6 +7,9 @@ import com.bball.stats.player.PlayerStatsResponse;
 import com.watchlist.Watchlist;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ public class WatchlistService {
     private final PlayerService playerService;
     private final RedisEventPublisher eventPublisher;
 
+    @Cacheable(value = "watchlist", key = "#userId")
     public List<WatchlistResponse> getUserWatchlist(Integer userId) {
         List<Watchlist> watchlists = repository.findByUserId(userId);
 
@@ -31,6 +35,10 @@ public class WatchlistService {
                 .collect(Collectors.toList());
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "watchlist", key = "#userId"),
+            @CacheEvict(value = "watchlist_details", key = "#userId") // If you cache the detailed view separately
+    })
     public WatchlistResponse addPlayerToWatchlist(Integer userId, String playerName) {
         // Validation
         var existing = repository.findByUserIdAndPlayerName(userId, playerName);
@@ -62,6 +70,10 @@ public class WatchlistService {
         return mapToResponse(savedWatchlist, "Player added to watchlist successfully");
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "watchlist", key = "#userId"),
+            @CacheEvict(value = "watchlist_details", key = "#userId")
+    })
     @Transactional
     public WatchlistResponse removePlayerFromWatchlist(Integer userId, String playerName) {
         var watchlist = repository.findByUserIdAndPlayerName(userId, playerName)
@@ -115,6 +127,7 @@ public class WatchlistService {
      * Get user's watchlist with player details (stats cached in Redis)
      * This method intelligently decides when to refresh player data based on last fetch time
      */
+    @Cacheable(value = "watchlist_details", key = "#userId")
     public List<WatchlistDetailedResponse> getUserWatchlistWithDetails(Integer userId) {
         List<Watchlist> watchlists = repository.findByUserId(userId);
 

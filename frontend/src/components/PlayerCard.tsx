@@ -20,6 +20,7 @@ interface PlayerCardProps {
 export default function PlayerCard({ player, initialIsWatchlisted = false }: PlayerCardProps) {
   const [loading, setLoading] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(initialIsWatchlisted);
+  useEffect(() => { setIsInWatchlist(initialIsWatchlisted); }, [initialIsWatchlisted]);
 
   // Data States
   const [last5Games, setLast5Games] = useState<GameLog[]>([]);
@@ -100,7 +101,10 @@ export default function PlayerCard({ player, initialIsWatchlisted = false }: Pla
             <span className="mr-2">🏀</span>
             {player.teamName || "N/A"}
           </span>
-          {/* Add Position if available in your API response, otherwise optional */}
+            <span className="flex items-center">
+                <span className="mr-2">👤</span>
+                {player.position || "N/A"}
+          </span>
         </div>
       </div>
 

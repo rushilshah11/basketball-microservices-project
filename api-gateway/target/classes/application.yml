@@ -10,6 +10,16 @@ spring:
         locator:
           enabled: true # Allows finding services automatically
           lower-case-service-id: true
+      globalcors:
+        add-to-simple-url-handler-mapping: true # Required for OPTIONS requests to work
+        cors-configurations:
+          '[/**]': # Apply to all routes
+            allowedOrigins:
+              - "http://localhost:3000" # Allow your frontend
+              - "http://localhost:3001"
+            allowedMethods: "*" # Allow GET, POST, PUT, DELETE, etc.
+            allowedHeaders: "*" # Allow all headers (like Authorization)
+            allowCredentials: true # Allow cookies/tokens
       routes:
         # 1. Route to Security Service
         - id: security-service
@@ -27,7 +37,11 @@ spring:
         - id: prediction-service
           uri: lb://PREDICTION-SERVICE
           predicates:
-            - Path=/predict/**, /predictions/**, /model/**, /training/**, /cache/**
+            - Path=/api/predict/**, /api/predictions/**, /api/model/**, /api/training/**, /api/cache/**
+          filters:
+            # CRITICAL: Remove the first part of the path (/api)
+            # This turns '/api/predictions/LeBron' into '/predictions/LeBron'
+            - StripPrefix=1
 
         # 4. Route to NBA Fetcher (Internal use mostly, but good for debugging)
         # We strip the prefix so /nba/player/LeBron -> NBA-FETCHER/player/LeBron

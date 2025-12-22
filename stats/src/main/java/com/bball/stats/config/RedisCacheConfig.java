@@ -31,7 +31,7 @@ public class RedisCacheConfig {
 
         // Player basic info - cache for 24 hours (doesn't change often)
         cacheConfigurations.put("player_info", defaultConfig
-                .entryTtl(Duration.ofHours(24)));
+                .entryTtl(Duration.ofHours(6)));
 
         // Player stats - cache for 6 hours (updates after games)
         cacheConfigurations.put("player_stats", defaultConfig
@@ -43,7 +43,10 @@ public class RedisCacheConfig {
 
         // Trending players - cache for 12 hours
         cacheConfigurations.put("trending_players", defaultConfig
-                .entryTtl(Duration.ofHours(12)));
+                .entryTtl(Duration.ofHours(1)));
+
+        cacheConfigurations.put("watchlist", defaultConfig
+                .entryTtl(Duration.ofMinutes(30)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

@@ -1,6 +1,7 @@
 package com.bball.stats.player;
 
 import com.bball.stats.config.NbaApiConfig;
+import com.bball.stats.exception.PlayerNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -67,7 +68,8 @@ public class PlayerService {
 
         } catch (Exception e) {
             log.error("Search failed for {}: {}", name, e.getMessage());
-            throw e;
+            // THROW CUSTOM EXCEPTION WITH NAME
+            throw new PlayerNotFoundException(name);
         }
     }
 
@@ -79,8 +81,11 @@ public class PlayerService {
      * 3. Unexpected Exception
      */
     public List<PlayerResponse> searchPlayersFallback(String name, Throwable t) {
+        if (t instanceof PlayerNotFoundException) {
+            throw (PlayerNotFoundException) t;
+        }
+
         log.warn("⚠️ Fallback active for search '{}': {}", name, t.getMessage());
-        // Return empty list so the frontend doesn't crash, just shows no results
         return Collections.emptyList();
     }
 
@@ -126,18 +131,22 @@ public class PlayerService {
             return restTemplate.getForObject(url, PlayerStatsResponse.class);
         } catch (Exception e) {
             log.error("Error fetching stats for {}: {}", name, e.getMessage());
-            throw new RuntimeException("Failed to fetch stats");
+            // THROW CUSTOM EXCEPTION WITH NAME
+            throw new PlayerNotFoundException(name);
         }
     }
 
-    public PlayerStatsResponse getStatsFallback(String name, Exception ex) {
+    public PlayerStatsResponse getStatsFallback(String name, Throwable t) {
+        if (t instanceof PlayerNotFoundException) {
+            throw (PlayerNotFoundException) t;
+        }
         log.warn("Could not fetch stats for {}. Returning null/empty.", name);
-        return null; // Or return cached data if you implemented a backup cache
+        return null;
     }
 
     // --- 4. Game Log (With Limit) ---
     @Cacheable(value = "game_logs", key = "#name + '-' + #limit")
-    @CircuitBreaker(name = "nbaFetcher", fallbackMethod = "getPlayerGameLogFallback")
+    @CircuitBreaker(name = "nbaFetcher", fallbackMethod = "getGameLogFallback")
     @RateLimiter(name = "nbaFetcher")
     public List<GameLogResponse> getPlayerGameLog(String name, int limit) {
         String url = UriComponentsBuilder
@@ -157,11 +166,15 @@ public class PlayerService {
             return response.getBody() != null ? response.getBody() : Collections.emptyList();
         } catch (Exception e) {
             log.error("Error fetching game log for {}: {}", name, e.getMessage());
-            return Collections.emptyList();
+            throw new PlayerNotFoundException(name);
         }
     }
 
     public List<GameLogResponse> getGameLogFallback(String name, int limit, Throwable t) {
+        // FIX: Rethrow if it's our custom 404
+        if (t instanceof PlayerNotFoundException) {
+            throw (PlayerNotFoundException) t;
+        }
         log.warn("⚠️ Fallback active for game log '{}': {}", name, t.getMessage());
         return Collections.emptyList();
     }
