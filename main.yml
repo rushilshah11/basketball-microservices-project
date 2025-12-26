@@ -1,0 +1,113 @@
+name: Basketball Microservices CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ------------------------------------------------------------------
+  # JOB 1: JAVA BUILD & TEST (Stats, Security, Gateway, Eureka)
+  # ------------------------------------------------------------------
+  java-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # Build & Test Eureka Server
+      - name: Build Eureka Server
+        working-directory: ./eureka-server
+        run: mvn clean package -DskipTests
+
+        # Build & Test Security Service
+        # Tests often fail in CI if they need a real DB, so we run them carefully or skip if needed.
+        # For now, we will try to run them.
+      - name: Test Security Service
+        working-directory: ./security
+        run: mvn test
+
+      # Build & Test Stats Service
+      - name: Test Stats Service
+        working-directory: ./stats
+        run: mvn test
+
+      # Build & Test Gateway
+      - name: Build API Gateway
+        working-directory: ./api-gateway
+        run: mvn package -DskipTests
+
+  # ------------------------------------------------------------------
+  # JOB 2: PYTHON BUILD & TEST (Prediction)
+  # ------------------------------------------------------------------
+  python-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        working-directory: ./prediction
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # ADDED: pytest-asyncio (Required for your async tests)
+          pip install pytest httpx pytest-asyncio 
+
+      - name: Run Python Tests
+        working-directory: ./prediction
+        run: |
+          # CHANGED: Run the actual test file you just created
+          pytest test_prediction_service.py
+
+  # ------------------------------------------------------------------
+  # JOB 3: DOCKER SANITY CHECK (Build Only)
+  # ------------------------------------------------------------------
+  docker-sanity:
+    runs-on: ubuntu-latest
+    needs: [java-build, python-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Eureka
+        uses: docker/build-push-action@v5
+        with:
+          context: ./eureka-server
+          push: false
+          tags: bball/eureka:test
+
+      - name: Build Stats
+        uses: docker/build-push-action@v5
+        with:
+          context: ./stats
+          push: false
+          tags: bball/stats:test
+
+      - name: Build Prediction
+        uses: docker/build-push-action@v5
+        with:
+          context: ./prediction
+          push: false
+          tags: bball/prediction:test
+
+      - name: Build NBA Fetcher
+        uses: docker/build-push-action@v5
+        with:
+          context: ./nba-fetcher
+          push: false
+          tags: bball/fetcher:test
