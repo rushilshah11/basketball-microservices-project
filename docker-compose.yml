@@ -18,6 +18,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: always
 
   # ------------------------------------------------------------------------
   # 2. Database for Stats-Service
@@ -36,6 +37,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: always
 
   # ------------------------------------------------------------------------
   # 2b. Database for Prediction-Service
@@ -54,6 +56,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: always
 
   # ------------------------------------------------------------------------
   # 3. Eureka Server (Service Discovery)
@@ -78,6 +81,7 @@ services:
         condition: service_healthy
       db-prediction:
         condition: service_healthy
+    restart: always
 
   # ------------------------------------------------------------------------
   # 4. Security Service (Auth-Service)
@@ -102,6 +106,7 @@ services:
     depends_on:
       eureka-server:
         condition: service_started
+    restart: always
 
   # ------------------------------------------------------------------------
   # 5. Stats Service
@@ -120,8 +125,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-      # !!! IMPORTANT: Replace this with your actual RapidAPI Key
-      NBA_API_BASE_URL: http://nba-fetcher:5000
+      NBA_API_BASE_URL: http://nba-fetcher:5001
       SPRING_DATA_REDIS_HOST: redis # Matches the service name 'redis' below
       SPRING_DATA_REDIS_PORT: 6379
       EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
@@ -132,6 +136,7 @@ services:
         condition: service_started
       redis:
         condition: service_started
+    restart: always
 
   # ------------------------------------------------------------------------
   # 6. NBA Fetcher (Python Sidecar) - NEW!
@@ -144,6 +149,7 @@ services:
       - "5001" # Expose port 5001
     networks:
       - default
+    restart: always
 
   redis:
     image: redis:alpine
@@ -152,6 +158,7 @@ services:
     #      - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: always
 
   # ------------------------------------------------------------------------
   # 7. Prediction Service (PyTorch Neural Network)
@@ -177,6 +184,7 @@ services:
         condition: service_started
     networks:
       - default
+    restart: always
 
   # ------------------------------------------------------------------------
   # 8. API Gateway
@@ -192,6 +200,7 @@ services:
     depends_on:
       eureka-server:
         condition: service_started
+    restart: always
 
   # 1. Zipkin (Distributed Tracing)
   zipkin:
@@ -201,6 +210,7 @@ services:
       - "9411:9411"
     networks:
       - default
+    restart: always
 
   # 2. Prometheus (Metrics Collection)
   prometheus:
@@ -212,6 +222,7 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - default
+    restart: always
 
   # 3. Grafana (Dashboard)
   grafana:
@@ -226,19 +237,21 @@ services:
       - zipkin
     networks:
       - default
+    restart: always
 
   frontend:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: http://api-gateway:8080
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: bball_frontend
     ports:
       - "3001:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://api-gateway:8080
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     depends_on:
       - api-gateway
+    restart: always
 volumes:
   postgres_security_data:
   postgres_stats_data:
