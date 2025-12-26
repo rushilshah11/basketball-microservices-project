@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -64,7 +66,7 @@ public class PlayerService {
                     .teamName(dto.getTeamName() != null ? dto.getTeamName() : "Unknown") // Handle null team
                     .position(dto.getPosition())
                     .build()
-            ).toList();
+            ).collect(Collectors.toCollection(ArrayList::new));
 
         } catch (Exception e) {
             log.error("Search failed for {}: {}", name, e.getMessage());

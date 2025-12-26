@@ -113,7 +113,7 @@ async def register_with_eureka():
             await eureka_client.init_async(
                 eureka_server="http://eureka-server:8761/eureka",
                 app_name="NBA-FETCHER",
-                instance_port=5000
+                instance_port=5001
             )
             logger.info("✅ Successfully registered with Eureka!")
             break  # Exit loop on success
@@ -317,4 +317,4 @@ def get_player_game_log(full_name: str, limit: int = Query(5, ge=1, le=82)):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=5000)
+    uvicorn.run(app, host='0.0.0.0', port=5001)
