@@ -92,7 +92,7 @@ public class PlayerService {
     }
 
     // --- 2. Batch Search (Trending) ---
-    @Cacheable(value = "trending_players", unless = "#result.isEmpty()")
+    @Cacheable(value = "batch_player_search", unless = "#result.isEmpty()")
     public List<PlayerResponse> searchPlayersBatch(List<String> names) {
         String url = nbaApiConfig.getBaseUrl() + "/players/batch";
 

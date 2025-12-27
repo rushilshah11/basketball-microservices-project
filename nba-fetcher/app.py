@@ -194,7 +194,7 @@ def get_players_batch(request: BatchRequest):
     results = []
     # Use ThreadPoolExecutor to run API calls in parallel
     # This makes fetching 10 players take ~1 second instead of ~10 seconds
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         # Submit all tasks
         future_to_name = {
             executor.submit(fetch_player_data_with_team, name): name
