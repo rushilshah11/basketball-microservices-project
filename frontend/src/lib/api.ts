@@ -236,3 +236,39 @@ export async function getPrediction(playerName: string): Promise<Prediction> {
     // Endpoint: /api/predictions/{name}
     return fetchAPI<Prediction>(`predictions/${encodeURIComponent(playerName)}`);
 }
+
+export async function getPredictionsBatch(playerNames: string[]): Promise<Record<string, Prediction>> {
+    const predictions: Record<string, Prediction> = {};
+
+    // Batch requests in groups of 10 to avoid overwhelming the service
+    for (let i = 0; i < playerNames.length; i += 10) {
+        const batch = playerNames.slice(i, i + 10);
+
+        try {
+            const results = await Promise.all(
+                batch.map(name =>
+                    fetchAPI<Prediction>(`predictions/${encodeURIComponent(name)}`)
+                        .catch(err => {
+                            console.warn(`Failed to get prediction for ${name}:`, err);
+                            return null;
+                        })
+                )
+            );
+
+            batch.forEach((name, idx) => {
+                if (results[idx]) {
+                    predictions[name] = results[idx];
+                }
+            });
+
+            // Small delay between batches to respect rate limits
+            if (i + 10 < playerNames.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        } catch (err) {
+            console.error('Batch prediction failed:', err);
+        }
+    }
+
+    return predictions;
+}

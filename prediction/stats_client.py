@@ -20,41 +20,43 @@ class StatsServiceClient:
         self.base_url = STATS_SERVICE_URL
         # We removed self.client here to prevent event loop conflicts
 
-    async def get_player_stats(self, player_name: str) -> Optional[Dict]:
+    async def get_player_stats(self, player_name: str, retries: int = 3) -> Optional[Dict]:
         """
-        Fetch player stats from Stats Service
-        Returns None if service is unavailable or returns empty data
+        Fetch player stats from Stats Service with retry logic
         """
-        try:
-            url = f"{self.base_url}/api/players/stats"
-            params = {"name": player_name}
+        for attempt in range(retries):
+            try:
+                url = f"{self.base_url}/api/players/stats"
+                params = {"name": player_name}
 
-            logger.info(f"📞 Calling Stats Service for: {player_name}")
+                async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                    response = await client.get(url, params=params)
 
-            # Create a fresh client for this request to use the current event loop
-            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-                response = await client.get(url, params=params)
-
-                if response.status_code == 200:
-                    data = response.json()
-
-                    # Handle empty response (fallback activated in Stats Service)
-                    if not data or data == {}:
-                        logger.warning(f"⚠️ Stats Service returned empty data for {player_name}")
+                    if response.status_code == 200:
+                        data = response.json()
+                        if not data or data == {}:
+                            logger.warning(f"⚠️ Stats Service returned empty data for {player_name}")
+                            return None
+                        return data
+                    elif response.status_code == 429:  # Rate limited
+                        wait_time = (2 ** attempt) * 0.5  # Exponential backoff
+                        logger.warning(f"⏳ Rate limited. Retrying in {wait_time}s (attempt {attempt + 1}/{retries})")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(f"❌ Stats Service error: {response.status_code}")
                         return None
 
-                    logger.info(f"✅ Received stats for {player_name}")
-                    return data
+            except httpx.TimeoutException:
+                logger.error(f"⏱️ Timeout calling Stats Service for {player_name}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(1)
                 else:
-                    logger.error(f"❌ Stats Service error: {response.status_code}")
                     return None
+            except Exception as e:
+                logger.error(f"❌ Error calling Stats Service: {e}")
+                return None
 
-        except httpx.TimeoutException:
-            logger.error(f"⏱️ Timeout calling Stats Service for {player_name}")
-            return None
-        except Exception as e:
-            logger.error(f"❌ Error calling Stats Service: {e}")
-            return None
+        return None
 
     async def get_player_game_log(self, player_name: str, limit: int = 5) -> Optional[list]:
         """

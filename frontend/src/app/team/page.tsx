@@ -9,6 +9,7 @@ import {
     Player,
     WatchlistItem,
     Prediction,
+    getPredictionsBatch
 } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 
@@ -79,36 +80,20 @@ export default function TeamPage() {
             setPlayers(initialPlayers);
 
             // Step 3: Fetch predictions in batches of 3 to avoid timeouts
-            // We update the state incrementally so the user sees progress
-            const predictionsMap = new Map<string, Prediction>();
 
-            await processInBatches(playerNames, 3, async (name) => {
-                try {
-                    const prediction = await getPrediction(name);
-                    if (prediction) {
-                        predictionsMap.set(name, prediction);
-                        // Update state incrementally
-                        setPlayers(current =>
-                            current.map(p => {
-                                if (p.fullName === name) {
-                                    return { ...p, prediction, loading: false };
-                                }
-                                return p;
-                            })
-                        );
-                    } else {
-                        // Handle case where prediction is null (mark loading false)
-                        setPlayers(current =>
-                            current.map(p => p.fullName === name ? { ...p, loading: false } : p)
-                        );
-                    }
-                } catch (e) {
-                    console.warn(`Failed to fetch prediction for ${name}`, e);
-                    setPlayers(current =>
-                        current.map(p => p.fullName === name ? { ...p, loading: false } : p)
-                    );
-                }
-            });
+            console.log(`🚀 Fetching predictions for ${playerNames.length} players...`);
+            const predictions = await getPredictionsBatch(playerNames);
+
+            setPlayers(current =>
+                current.map(p => ({
+                    ...p,
+                    prediction: predictions[p.fullName] || undefined,
+                    loading: false
+                }))
+            );
+
+            console.log(`✅ Loaded ${Object.keys(predictions).length} predictions`);
+
 
         } catch (err) {
             console.error('Failed to load team data:', err);

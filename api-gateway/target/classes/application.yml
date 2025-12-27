@@ -25,16 +25,6 @@ spring:
             allowedHeaders: "*" # Allow all headers (like Authorization)
             allowCredentials: true # Allow cookies/tokens
       routes:
-        - id: stats-service
-          uri: lb://STATS-SERVICE
-          predicates:
-            - Path=/api/players/**, /api/watchlists/**
-          filters:
-            - name: RequestRateLimiter
-            - args:
-               redis-rate-limiter.replenishRate: 20 # 20 req/sec
-               redis-rate-limiter.burstCapacity: 40
-               key-resolver: "#{@ipKeyResolver}"
         # 1. Route to Security Service
         - id: security-service
           uri: lb://SECURITY-SERVICE  # 'lb' means Load Balanced via Eureka
@@ -46,6 +36,12 @@ spring:
           uri: lb://STATS-SERVICE
           predicates:
             - Path=/api/players/**, /api/watchlists/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20 # 20 req/sec
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@ipKeyResolver}"
 
         # 3. Route to Prediction Service
         - id: prediction-service
@@ -58,8 +54,8 @@ spring:
             - StripPrefix=1
             - name: RequestRateLimiter  # <--- ADD THIS SECTION
               args:
-               redis-rate-limiter.replenishRate: 5
-               redis-rate-limiter.burstCapacity: 10
+               redis-rate-limiter.replenishRate: 20
+               redis-rate-limiter.burstCapacity: 30
                key-resolver: "#{@ipKeyResolver}"
 
         # 4. Route to NBA Fetcher (Internal use mostly, but good for debugging)
