@@ -1,9 +1,12 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" version="29.2.9">
   <diagram name="Page-1" id="sWHO2a4Xf3pWyni2GHv_">
-    <mxGraphModel dx="860" dy="771" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="2101" dy="1122" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
+        <mxCell id="jrCMmT_sWo0Th6YPGkVB-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="630" width="850" x="-20" y="25" as="geometry" />
+        </mxCell>
         <mxCell id="P7Q8RvWAG2wMcB7MJFQ3-13" edge="1" parent="1" source="P7Q8RvWAG2wMcB7MJFQ3-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="P7Q8RvWAG2wMcB7MJFQ3-4" value="&lt;font style=&quot;font-size: 13px;&quot;&gt;&lt;b&gt;Verifies Token&lt;/b&gt;&lt;/font&gt;">
           <mxGeometry relative="1" as="geometry">
             <mxPoint as="offset" />
@@ -49,6 +52,9 @@
         </mxCell>
         <mxCell id="P7Q8RvWAG2wMcB7MJFQ3-12" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontColor=light-dark(#000000,#3399FF);" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;Watchlist Repository&lt;/b&gt;&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/span&gt;&lt;div&gt;Talks to Postgres.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Code: WatchlistRepository&lt;span style=&quot;background-color: transparent;&quot;&gt;.java&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="120" width="220" x="60" y="480" as="geometry" />
+        </mxCell>
+        <mxCell id="jrCMmT_sWo0Th6YPGkVB-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;Stats Service&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="120" y="40" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
