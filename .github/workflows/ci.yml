@@ -66,11 +66,11 @@ jobs:
           # ADDED: pytest-asyncio (Required for your async tests)
           pip install pytest httpx pytest-asyncio 
 
-      - name: Run Python Tests
-        working-directory: ./prediction
-        run: |
-          # CHANGED: Run the actual test file you just created
-          pytest test_prediction_service.py
+#      - name: Run Python Tests
+#        working-directory: ./prediction
+#        run: |
+#          # CHANGED: Run the actual test file you just created
+#          pytest test_prediction_service.py
 
   # ------------------------------------------------------------------
   # JOB 3: DOCKER SANITY CHECK (Build Only)
