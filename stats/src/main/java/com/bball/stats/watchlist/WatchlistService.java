@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -131,9 +132,10 @@ public class WatchlistService {
     public List<WatchlistDetailedResponse> getUserWatchlistWithDetails(Integer userId) {
         List<Watchlist> watchlists = repository.findByUserId(userId);
 
-        return watchlists.stream()
-                .map(watchlist -> {
-                    WatchlistDetailedResponse.WatchlistDetailedResponseBuilder builder = 
+        // 1. Launch all tasks in parallel (non-blocking creation)
+        List<CompletableFuture<WatchlistDetailedResponse>> futures = watchlists.stream()
+                .map(watchlist -> CompletableFuture.supplyAsync(() -> {
+                    WatchlistDetailedResponse.WatchlistDetailedResponseBuilder builder =
                             WatchlistDetailedResponse.builder()
                                     .id(watchlist.getId())
                                     .playerName(watchlist.getPlayerName())
@@ -141,25 +143,29 @@ public class WatchlistService {
                                     .addedAt(watchlist.getAddedAt())
                                     .lastStatsFetch(watchlist.getLastStatsFetch());
 
-                    // Fetch player stats (will be cached in Redis)
                     try {
+                        // Fetch stats (parallel network/cache call)
                         PlayerStatsResponse stats = playerService.getPlayerStats(watchlist.getPlayerName());
                         builder.stats(stats);
 
-                        // Update last fetch time if it's been more than 6 hours or never fetched
+                        // Update metadata (parallel DB call)
                         if (shouldUpdateFetchTime(watchlist.getLastStatsFetch())) {
                             watchlist.setLastStatsFetch(LocalDateTime.now());
                             repository.save(watchlist);
                         }
                     } catch (Exception e) {
-                        log.error("Failed to fetch stats for player {}: {}", 
+                        log.error("Failed to fetch stats for player {}: {}",
                                 watchlist.getPlayerName(), e.getMessage());
-                        // Return without stats if fetch fails
                         builder.stats(null);
                     }
 
                     return builder.build();
-                })
+                }))
+                .collect(Collectors.toList());
+
+        // 2. Aggregate results (waits for the slowest request, not the sum of all requests)
+        return futures.stream()
+                .map(CompletableFuture::join)
                 .collect(Collectors.toList());
     }
 
