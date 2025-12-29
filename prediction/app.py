@@ -1,85 +1,28 @@
-from fastapi import FastAPI, HTTPException, Depends, Response, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 import torch
 import torch.nn as nn
 import numpy as np
 import logging
-from logging.handlers import RotatingFileHandler
 import py_eureka_client.eureka_client as eureka_client
 import os
 import redis
 import threading
 import json
 from sqlalchemy.orm import Session
-import asyncio
-
-from opentelemetry import trace
-from opentelemetry.exporter.zipkin.json import ZipkinExporter
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
-
-# Define the Service Name (Change to "nba-fetcher" for that service)
-resource = Resource(attributes={
-    SERVICE_NAME: "prediction-service"
-})
-
-# Set up the Zipkin Exporter
-zipkin_exporter = ZipkinExporter(
-    endpoint="http://zipkin:9411/api/v2/spans"
-)
-
-# Set up the Tracer Provider
-provider = TracerProvider(resource=resource)
-processor = BatchSpanProcessor(zipkin_exporter)
-provider.add_span_processor(processor)
-trace.set_tracer_provider(provider)
-
-# Instrument Requests (outgoing calls to Stats Service)
-RequestsInstrumentor().instrument()
 
 # Import our new modules
-from database import init_db, get_db, TrainingMetadata
+from database import init_db, get_db
 from cache import PredictionCache, test_redis_connection
 from prediction_service import PredictionService
 from stats_client import stats_client
-from data_collector import DataCollector
-from model_trainer import ModelTrainer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("prediction-service")
 
-# Audit logger: write structured audit events to a rotating file for forensics
-os.makedirs("logs", exist_ok=True)
-audit_handler = RotatingFileHandler("logs/audit-prediction.log", maxBytes=5_242_880, backupCount=5)
-audit_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-audit_handler.setFormatter(audit_formatter)
-audit_logger = logging.getLogger("audit")
-audit_logger.setLevel(logging.INFO)
-if not audit_logger.handlers:
-    audit_logger.addHandler(audit_handler)
-
 app = FastAPI(title="Basketball Prediction Service")
-FastAPIInstrumentor.instrument_app(app)
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    # Audit the exception with request context for forensic analysis
-    try:
-        ip = request.client.host if request.client else "unknown"
-        audit_logger.info(f"exception|service=prediction|ip={ip}|path={request.url.path}|error={str(exc)}")
-    except Exception:
-        audit_logger.info(f"exception|service=prediction|error={str(exc)}")
-
-    return JSONResponse(
-        status_code=500,
-        content={"message": f"Prediction could not be made. System error: {str(exc)}"},
-    )
 
 # ============================================
 # Neural Network Model
@@ -120,9 +63,8 @@ model.eval()  # Set to evaluation mode
 
 logger.info("Neural network model initialized")
 
-# Initialize prediction service and trainer
+# Initialize prediction service
 prediction_service = PredictionService(model)
-model_trainer = ModelTrainer(model)
 
 # ============================================
 # Request/Response Models
@@ -283,25 +225,6 @@ def redis_listener():
 # API Endpoints
 # ============================================
 
-# Add this helper function (copied from your nba-fetcher)
-async def register_with_eureka():
-    """
-    Attempts to register with Eureka in a loop until successful.
-    """
-    while True:
-        try:
-            logger.info("Attempting to register with Eureka...")
-            await eureka_client.init_async(
-                eureka_server="http://eureka-server:8761/eureka",
-                app_name="PREDICTION-SERVICE",
-                instance_port=5002 # Make sure this matches your service port
-            )
-            logger.info("✅ Successfully registered with Eureka!")
-            break  # Exit loop on success
-        except Exception as e:
-            logger.warning(f"❌ Eureka not ready yet ({e}). Retrying in 5 seconds...")
-            await asyncio.sleep(5)
-
 # 3. Start Listener in Background Thread on Startup
 @app.on_event("startup")
 async def startup_event():
@@ -310,13 +233,6 @@ async def startup_event():
     # Initialize database
     logger.info("🔧 Initializing database...")
     init_db()
-    
-    # Try to load existing trained model
-    logger.info("🔧 Loading trained model (if available)...")
-    if model_trainer.load_model():
-        logger.info("✅ Loaded pre-trained model")
-    else:
-        logger.info("⚠️ No pre-trained model found - using randomly initialized model")
     
     # Test Redis connection
     logger.info("🔧 Testing Redis connection...")
@@ -328,8 +244,11 @@ async def startup_event():
     logger.info("✅ Redis listener started")
 
     # Register with Eureka
-    # This prevents the container from crashing if Eureka is slow
-    asyncio.create_task(register_with_eureka())
+    await eureka_client.init_async(
+        eureka_server="http://eureka-server:8761/eureka",
+        app_name="PREDICTION-SERVICE",
+        instance_port=5002
+    )
     logger.info("✅ Registered with Eureka")
 
 @app.on_event("shutdown")
@@ -349,16 +268,13 @@ def health_check():
     }
 
 @app.post("/predict", response_model=PredictionResponse)
-def predict_player_performance(http_request: Request, request: PredictionRequest):
+def predict_player_performance(request: PredictionRequest):
     """
     Predict player performance for next game.
     """
     logger.info(f"Prediction request for: {request.playerName}")
+    
     try:
-        # Audit the incoming request (IP+path+player)
-        client_ip = http_request.client.host if http_request.client else "unknown"
-        audit_logger.info(f"request|service=prediction|ip={client_ip}|path=/predict|player={request.playerName}")
-
         predicted_pts, predicted_ast, predicted_reb, confidence = predict_performance(
             request.currentStats,
             request.homeGame
@@ -374,23 +290,14 @@ def predict_player_performance(http_request: Request, request: PredictionRequest
         
     except Exception as e:
         logger.error(f"Error predicting for {request.playerName}: {e}")
-        try:
-            audit_logger.error(f"error|service=prediction|player={request.playerName}|error={e}")
-        except Exception:
-            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/predict/batch")
-def predict_batch(http_request: Request, request: BatchPredictionRequest):
+def predict_batch(request: BatchPredictionRequest):
     """
     Batch prediction for multiple players.
     """
     logger.info(f"Batch prediction for {len(request.predictions)} players")
-    try:
-        client_ip = http_request.client.host if http_request.client else "unknown"
-        audit_logger.info(f"request|service=prediction|ip={client_ip}|path=/predict/batch|count={len(request.predictions)}")
-    except Exception:
-        audit_logger.info(f"request|service=prediction|count={len(request.predictions)}")
     
     results = []
     for pred_req in request.predictions:
@@ -409,10 +316,6 @@ def predict_batch(http_request: Request, request: BatchPredictionRequest):
             ))
         except Exception as e:
             logger.error(f"Error in batch prediction for {pred_req.playerName}: {e}")
-            try:
-                audit_logger.error(f"error|service=prediction|player={pred_req.playerName}|error={e}")
-            except Exception:
-                pass
             # Continue with other predictions
             
     return results
@@ -432,45 +335,38 @@ def model_info():
         "futureEnhancements": ["GNN", "Attention Mechanism", "Player Embeddings"]
     }
 
-@app.get("/predictions/{player_name}", response_model=PredictionResponse)
+@app.get("/predictions/{player_name}")
 async def get_player_prediction(player_name: str, db: Session = Depends(get_db)):
     """
     Get stored prediction for a player (from cache or database)
     If not found, generates a new prediction
     """
     logger.info(f"📊 Fetching prediction for: {player_name}")
-
+    
     try:
         # Try to get stored prediction
-        prediction_data = prediction_service.get_stored_prediction(player_name, db)
-
-        if not prediction_data:
-            # If not found, generate new prediction
-            logger.info(f"🔄 Generating new prediction for {player_name}")
-            prediction_data = await prediction_service.generate_prediction_for_player(
-                player_name=player_name,
-                db=db,
-                force_refresh=False
-            )
-
-        if prediction_data:
-            logger.info(f"✅ Found/Generated prediction for {player_name}")
-
-            # 2. FIX: Map the nested dictionary to the flat PredictionResponse model
-            return PredictionResponse(
-                playerName=prediction_data["player_name"],
-                predictedPoints=prediction_data["predicted_stats"]["pts"],
-                predictedAssists=prediction_data["predicted_stats"]["ast"],
-                predictedRebounds=prediction_data["predicted_stats"]["reb"],
-                confidence=prediction_data["confidence"],
-                model="basic_nn"
-            )
+        prediction = prediction_service.get_stored_prediction(player_name, db)
+        
+        if prediction:
+            logger.info(f"✅ Found stored prediction for {player_name}")
+            return prediction
+        
+        # If not found, generate new prediction
+        logger.info(f"🔄 Generating new prediction for {player_name}")
+        prediction = await prediction_service.generate_prediction_for_player(
+            player_name=player_name,
+            db=db,
+            force_refresh=False
+        )
+        
+        if prediction:
+            return prediction
         else:
             raise HTTPException(
                 status_code=404,
                 detail=f"Could not generate prediction for {player_name}. Stats may be unavailable."
             )
-
+    
     except Exception as e:
         logger.error(f"Error fetching prediction for {player_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -548,109 +444,18 @@ async def invalidate_cache():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/training/collect/{player_name}")
-async def collect_player_data(player_name: str, limit: int = 10, db: Session = Depends(get_db)):
-    """
-    Collect and store game logs for a specific player
-    This builds the training dataset
-    """
-    logger.info(f"📥 Collecting game data for: {player_name}")
-    
-    try:
-        stored_count = await DataCollector.collect_and_store_game_logs(
-            player_name=player_name,
-            db=db,
-            limit=limit
-        )
-        
-        return {
-            "message": f"Collected data for {player_name}",
-            "games_stored": stored_count,
-            "player_name": player_name
-        }
-    except Exception as e:
-        logger.error(f"Error collecting data: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/training/train")
-async def train_model(
-    epochs: int = 50,
-    batch_size: int = 32,
-    learning_rate: float = 0.001,
-    db: Session = Depends(get_db)
-):
-    """
-    Train the model on collected game data
-    Requires sufficient training data in the database
-    """
-    logger.info(f"🎓 Starting model training (epochs={epochs})")
-    
-    try:
-        # Get training data
-        game_logs = DataCollector.get_player_training_data(db)
-        
-        if len(game_logs) < 50:
-            return {
-                "error": "Insufficient training data",
-                "message": f"Need at least 50 game logs, found {len(game_logs)}",
-                "suggestion": "Use /training/collect/{player_name} to collect more data"
-            }
-        
-        # Train model
-        result = model_trainer.train(
-            game_logs=game_logs,
-            db=db,
-            epochs=epochs,
-            batch_size=batch_size,
-            learning_rate=learning_rate
-        )
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error training model: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/training/status")
-async def get_training_status(db: Session = Depends(get_db)):
-    """
-    Get status of training data and recent training runs
-    """
-    try:
-        # Get data statistics
-        data_stats = DataCollector.get_training_stats(db)
-        
-        # Get recent training runs
-        recent_trainings = db.query(TrainingMetadata).order_by(
-            TrainingMetadata.started_at.desc()
-        ).limit(5).all()
-        
-        return {
-            "data_stats": data_stats,
-            "recent_trainings": [t.to_dict() for t in recent_trainings],
-            "model_status": "trained" if model_trainer.load_model() else "untrained"
-        }
-    except Exception as e:
-        logger.error(f"Error getting training status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/")
 def root():
     """Root endpoint"""
     return {
         "service": "Basketball Prediction Service",
-        "version": "3.0.0",
+        "version": "2.0.0",
         "features": [
             "Neural Network Predictions",
             "Redis Caching",
             "PostgreSQL Storage",
             "Stats Service Integration",
-            "Watchlist Event Listener",
-            "Model Training & Persistence",
-            "Historical Game Data Collection"
+            "Watchlist Event Listener"
         ],
         "endpoints": {
             "predict": "/predict",
@@ -659,9 +464,6 @@ def root():
             "refresh_prediction": "/predictions/{player_name}/refresh",
             "all_predictions": "/predictions",
             "invalidate_cache": "/cache/invalidate",
-            "collect_data": "/training/collect/{player_name}",
-            "train_model": "/training/train",
-            "training_status": "/training/status",
             "health": "/health",
             "info": "/model/info"
         }

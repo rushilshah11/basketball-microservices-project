@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_security_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d bball-security"]
+      test: ["CMD-SHELL", "pg_isready -U LeDB -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,7 +33,7 @@ services:
     volumes:
       - postgres_stats_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d bball-stats"]
+      test: ["CMD-SHELL", "pg_isready -U LeDB -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,7 +52,7 @@ services:
     volumes:
       - postgres_prediction_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d bball-prediction"]
+      test: ["CMD-SHELL", "pg_isready -U LeDB -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -96,7 +96,7 @@ services:
       - "8082" # Expose Security API endpoint
     environment:
       # Link DB and Eureka using container service names
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db-security:5432/bball-security
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-security:5432/${DB_SECURITY_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       APPLICATION_SECURITY_JWT_SECRET_KEY: ${JWT_SECRET} # <--- CRITICAL
@@ -104,6 +104,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
     depends_on:
+      db-security:
+        condition: service_healthy
       eureka-server:
         condition: service_started
     restart: always
@@ -121,7 +123,7 @@ services:
       - "8081" # Expose Stats API endpoint
     environment:
       # Link DB and Eureka using container service names
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db-stats:5432/bball-stats
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-stats:5432/${DB_STATS_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
@@ -130,6 +132,8 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
     depends_on:
+      db-stats:
+        condition: service_healthy
       eureka-server:
         condition: service_started
       security-service:
@@ -173,12 +177,14 @@ services:
       PYTHONUNBUFFERED: 1
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@db-prediction:5432/bball-prediction
+      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@db-prediction:5432/${DB_PREDICTION_NAME}
       STATS_SERVICE_URL: http://stats-service:8081
     depends_on:
       db-prediction:
         condition: service_healthy
       redis:
+        condition: service_started
+      eureka-server:
         condition: service_started
       stats-service:
         condition: service_started
