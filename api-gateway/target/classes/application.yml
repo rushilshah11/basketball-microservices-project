@@ -1,0 +1,91 @@
+server:
+  port: 8080  # The Gateway will be the entry point on port 8080
+
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      host: redis
+      port: 6379
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true # Allows finding services automatically
+          lower-case-service-id: true
+      globalcors:
+        add-to-simple-url-handler-mapping: true # Required for OPTIONS requests to work
+        cors-configurations:
+          '[/**]': # Apply to all routes
+            allowedOrigins:
+              - "http://localhost:3000" # Allow your frontend
+              - "http://localhost:3001"
+            allowedMethods: "*" # Allow GET, POST, PUT, DELETE, etc.
+            allowedHeaders: "*" # Allow all headers (like Authorization)
+            allowCredentials: true # Allow cookies/tokens
+      routes:
+        # 1. Route to Security Service
+        - id: security-service
+          uri: lb://SECURITY-SERVICE  # 'lb' means Load Balanced via Eureka
+          predicates:
+            - Path=/api/v1/auth/** # Login/Register endpoints
+
+        # 2. Route to Stats Service (Players & Watchlists)
+        - id: stats-service
+          uri: lb://STATS-SERVICE
+          predicates:
+            - Path=/api/players/**, /api/watchlists/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20 # 20 req/sec
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@ipKeyResolver}"
+
+        # 3. Route to Prediction Service
+        - id: prediction-service
+          uri: lb://PREDICTION-SERVICE
+          predicates:
+            - Path=/api/predict/**, /api/predictions/**, /api/model/**, /api/training/**, /api/cache/**
+          filters:
+            # CRITICAL: Remove the first part of the path (/api)
+            # This turns '/api/predictions/LeBron' into '/predictions/LeBron'
+            - StripPrefix=1
+            - name: RequestRateLimiter  # <--- ADD THIS SECTION
+              args:
+               redis-rate-limiter.replenishRate: 20
+               redis-rate-limiter.burstCapacity: 30
+               key-resolver: "#{@ipKeyResolver}"
+
+        # 4. Route to NBA Fetcher (Internal use mostly, but good for debugging)
+        # We strip the prefix so /nba/player/LeBron -> NBA-FETCHER/player/LeBron
+        - id: nba-fetcher
+          uri: lb://NBA-FETCHER
+          predicates:
+            - Path=/nba/**
+          filters:
+            - StripPrefix=1
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+  instance:
+    hostname: localhost
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # Log 100% of requests for development
+  zipkin:
+    tracing:
+      endpoint: "http://zipkin:9411/api/v2/spans"
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus # Enable the /prometheus endpoint
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
