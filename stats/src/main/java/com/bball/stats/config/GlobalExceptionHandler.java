@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -19,6 +20,15 @@ public class GlobalExceptionHandler {
         AuditLogger.info("not_found|service=stats|message=" + ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> handleResponseStatusException(ResponseStatusException ex) {
+        HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+        String message = ex.getReason() != null ? ex.getReason() : "Request failed";
+        AuditLogger.error("response_status_exception|service=stats|status=" + status.value() + "|message=" + message);
+        return ResponseEntity.status(status)
+                .body(Map.of("message", message));
     }
 
     @ExceptionHandler(Exception.class)

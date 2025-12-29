@@ -39,12 +39,26 @@ async function handler(
             duplex: 'half',
         });
 
-        // 5. Return the response back to the Client
-        const data = await response.json();
-        return NextResponse.json(data, { status: response.status });
+        // 5. Check if response is JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return NextResponse.json(data, { status: response.status });
+        } else {
+            // Handle non-JSON responses
+            const text = await response.text();
+            return NextResponse.json(
+                { error: text || 'Request failed' }, 
+                { status: response.status }
+            );
+        }
 
-    } catch (error) {
-        return NextResponse.json({ error: 'Proxy failed' }, { status: 500 });
+    } catch (error: any) {
+        console.error('Proxy error:', error);
+        return NextResponse.json(
+            { error: error.message || 'Proxy failed' }, 
+            { status: 500 }
+        );
     }
 }
 

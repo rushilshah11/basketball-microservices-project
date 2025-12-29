@@ -208,42 +208,42 @@ services:
         condition: service_started
     restart: always
 
-  # 1. Zipkin (Distributed Tracing)
-  zipkin:
-    image: openzipkin/zipkin
-    container_name: bball_zipkin
-    ports:
-      - "9411:9411"
-    networks:
-      - default
-    restart: always
+  # 1. Zipkin (Distributed Tracing) - COMMENTED OUT FOR NOW
+  # zipkin:
+  #   image: openzipkin/zipkin
+  #   container_name: bball_zipkin
+  #   ports:
+  #     - "9411:9411"
+  #   networks:
+  #     - default
+  #   restart: always
 
-  # 2. Prometheus (Metrics Collection)
-  prometheus:
-    image: prom/prometheus
-    container_name: bball_prometheus
-    expose:
-      - "9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    networks:
-      - default
-    restart: always
+  # 2. Prometheus (Metrics Collection) - COMMENTED OUT FOR NOW
+  # prometheus:
+  #   image: prom/prometheus
+  #   container_name: bball_prometheus
+  #   expose:
+  #     - "9090"
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  #   networks:
+  #     - default
+  #   restart: always
 
-  # 3. Grafana (Dashboard)
-  grafana:
-    image: grafana/grafana
-    container_name: bball_grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=password # Login with admin/password
-    depends_on:
-      - prometheus
-      - zipkin
-    networks:
-      - default
-    restart: always
+  # 3. Grafana (Dashboard) - COMMENTED OUT FOR NOW
+  # grafana:
+  #   image: grafana/grafana
+  #   container_name: bball_grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=password # Login with admin/password
+  #   depends_on:
+  #     - prometheus
+  #     - zipkin
+  #   networks:
+  #     - default
+  #   restart: always
 
   frontend:
     build:

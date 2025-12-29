@@ -5,21 +5,48 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 
 import java.security.Key;
-import java.security.Signature;
-import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+@Slf4j
 @Service
 public class JwtService {
 
-    private static final String SECRET_KEY = "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1";
+    @Value("${application.security.jwt.secret-key:}")
+    private String secretKey;
+
+    @PostConstruct
+    public void validateSecretKey() {
+        if (secretKey == null || secretKey.trim().isEmpty()) {
+            log.error("❌ CRITICAL: JWT secret key is not configured!");
+            throw new IllegalStateException(
+                "JWT secret key is REQUIRED for production. " +
+                "Please set APPLICATION_SECURITY_JWT_SECRET_KEY environment variable. " +
+                "Generate a secure key using: openssl rand -base64 64"
+            );
+        }
+        
+        // Validate Base64 format early
+        try {
+            Decoders.BASE64.decode(secretKey);
+            log.info("✅ JWT secret key configured successfully");
+        } catch (IllegalArgumentException e) {
+            log.error("❌ CRITICAL: Invalid JWT secret key format!");
+            throw new IllegalStateException(
+                "Invalid JWT secret key format. The secret must be a valid Base64-encoded string. " +
+                "Generate a new one using: openssl rand -base64 64", e
+            );
+        }
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -70,7 +97,18 @@ public class JwtService {
     }
 
     private Key getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
-        return Keys.hmacShaKeyFor(keyBytes);
+        // Validation is done in @PostConstruct, but double-check here for safety
+        if (secretKey == null || secretKey.trim().isEmpty()) {
+            throw new IllegalStateException("JWT secret key is not configured. Please set APPLICATION_SECURITY_JWT_SECRET_KEY environment variable.");
+        }
+        try {
+            byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+            return Keys.hmacShaKeyFor(keyBytes);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(
+                "Invalid JWT secret key format. The secret must be a valid Base64-encoded string. " +
+                "Generate a new one using: openssl rand -base64 64", e
+            );
+        }
     }
 }
