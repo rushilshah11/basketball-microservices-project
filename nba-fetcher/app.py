@@ -16,6 +16,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
+import os
+eureka_url = os.getenv('EUREKA_CLIENT_SERVICEURL_DEFAULTZONE')
 
 # --- NEW: Configure Tracer ---
 resource = Resource(attributes={
@@ -37,15 +39,19 @@ RequestsInstrumentor().instrument()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nba-fetcher")
-# Audit logger
-import os
-os.makedirs("logs", exist_ok=True)
-audit_handler = RotatingFileHandler("logs/audit-nbafetcher.log", maxBytes=5_242_880, backupCount=5)
-audit_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-audit_handler.setFormatter(audit_formatter)
+
+import sys
+
+# Audit logger - Configuration for Docker/AWS (Stdout)
 audit_logger = logging.getLogger("audit")
 audit_logger.setLevel(logging.INFO)
+
+# Only add handler if not already present
 if not audit_logger.handlers:
+    # StreamHandler writes to sys.stderr (or sys.stdout) which Docker captures
+    audit_handler = logging.StreamHandler(sys.stdout)
+    audit_formatter = logging.Formatter('%(asctime)s [AUDIT] %(message)s')
+    audit_handler.setFormatter(audit_formatter)
     audit_logger.addHandler(audit_handler)
 
 app = FastAPI(title="NBA Fetcher Microservice")
@@ -111,7 +117,7 @@ async def register_with_eureka():
         try:
             logger.info("Attempting to register with Eureka...")
             await eureka_client.init_async(
-                eureka_server="http://eureka-server:8761/eureka",
+                eureka_server=eureka_url,
                 app_name="NBA-FETCHER",
                 instance_port=5001
             )

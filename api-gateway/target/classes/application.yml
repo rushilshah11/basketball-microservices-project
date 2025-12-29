@@ -6,7 +6,7 @@ spring:
     name: api-gateway
   data:
     redis:
-      host: redis
+      host: ${SPRING_DATA_REDIS_HOST}
       port: 6379
   cloud:
     gateway:

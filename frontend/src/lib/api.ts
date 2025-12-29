@@ -232,9 +232,21 @@ export async function getWatchlist(userId: number = 1): Promise<WatchlistItem[]>
 
 // --- Prediction API ---
 
+function transformPredictionResponse(data: any): Prediction {
+    return {
+        playerName: data.player_name,
+        predictedPoints: data.predicted_stats?.pts,
+        predictedAssists: data.predicted_stats?.ast,
+        predictedRebounds: data.predicted_stats?.reb,
+        confidence: data.confidence,
+        createdAt: data.created_at,
+    };
+}
+
 export async function getPrediction(playerName: string): Promise<Prediction> {
     // Endpoint: /api/predictions/{name}
-    return fetchAPI<Prediction>(`predictions/${encodeURIComponent(playerName)}`);
+    const data = await fetchAPI<any>(`predictions/${encodeURIComponent(playerName)}`);
+    return transformPredictionResponse(data);
 }
 
 export async function getPredictionsBatch(playerNames: string[]): Promise<Record<string, Prediction>> {
@@ -247,7 +259,7 @@ export async function getPredictionsBatch(playerNames: string[]): Promise<Record
         try {
             const results = await Promise.all(
                 batch.map(name =>
-                    fetchAPI<Prediction>(`predictions/${encodeURIComponent(name)}`)
+                    fetchAPI<any>(`predictions/${encodeURIComponent(name)}`)
                         .catch(err => {
                             console.warn(`Failed to get prediction for ${name}:`, err);
                             return null;
@@ -257,7 +269,7 @@ export async function getPredictionsBatch(playerNames: string[]): Promise<Record
 
             batch.forEach((name, idx) => {
                 if (results[idx]) {
-                    predictions[name] = results[idx];
+                    predictions[name] = transformPredictionResponse(results[idx]);
                 }
             });
 
