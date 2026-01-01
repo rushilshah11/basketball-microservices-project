@@ -8,8 +8,8 @@ services:
       args:
         - JAR_FILE=target/eureka-server-0.0.1-SNAPSHOT.jar
     container_name: bball_eureka_server
-    expose:
-      - "8761"
+    ports:
+      - "8761:8671"
     environment:
       - EUREKA_INSTANCE_HOSTNAME=eureka-server
       - JAVA_TOOL_OPTIONS=-Xmx400m
@@ -64,7 +64,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SERVER_PORT=8081
-      - JAVA_TOOL_OPTIONS=-Xmx400m
+      - JAVA_TOOL_OPTIONS=-Xmx750m
       # Connect to AWS RDS
       - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_ENDPOINT}:5432/${DB_STATS_NAME}
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
