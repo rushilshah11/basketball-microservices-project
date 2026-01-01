@@ -14,6 +14,11 @@ services:
       - EUREKA_INSTANCE_HOSTNAME=eureka-server
       - JAVA_TOOL_OPTIONS=-Xmx400m
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     restart: always
 
   # 2. Security Service
@@ -73,8 +78,10 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
     depends_on:
-      - eureka-server
-      - security-service
+      eureka-server:
+        condition: service_healthy
+      security-service:
+        condition: service_started
     restart: always
 
   # 4. NBA Fetcher
