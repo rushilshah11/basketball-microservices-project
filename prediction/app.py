@@ -160,7 +160,8 @@ def predict_performance(stats: PlayerStats, home_game: bool = True) -> tuple:
 # 1. Setup Redis Connection for Events (db=0)
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-redis_event_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+REDIS_SSL = os.getenv("REDIS_SSL", "false").lower() == "true"
+redis_event_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, ssl=REDIS_SSL)
 
 # 2. Define the Subscriber Logic
 def redis_listener():

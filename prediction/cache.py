@@ -12,34 +12,36 @@ logger = logging.getLogger("prediction-service")
 # Redis configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_SSL = os.getenv("REDIS_SSL", "false").lower() == "true"
 CACHE_TTL = 3600  # 1 hour cache expiration
 
 # Redis client
+# Updated to support SSL for AWS ElastiCache
 redis_client = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
     db=1,  # Use db=1 for predictions cache (db=0 for events)
+    ssl=REDIS_SSL,
     decode_responses=True
 )
 
-
 class PredictionCache:
     """Redis cache manager for predictions"""
-    
+
     CACHE_PREFIX = "prediction:"
-    
+
     @staticmethod
     def _get_cache_key(player_name: str) -> str:
         """Generate cache key for player"""
         return f"{PredictionCache.CACHE_PREFIX}{player_name.lower()}"
-    
+
     @staticmethod
     def get(player_name: str) -> Optional[Dict]:
         """Get prediction from cache"""
         try:
             cache_key = PredictionCache._get_cache_key(player_name)
             cached = redis_client.get(cache_key)
-            
+
             if cached:
                 logger.info(f"✅ Cache HIT for {player_name}")
                 return json.loads(cached)
@@ -49,7 +51,7 @@ class PredictionCache:
         except Exception as e:
             logger.error(f"Error reading from cache: {e}")
             return None
-    
+
     @staticmethod
     def set(player_name: str, prediction_data: Dict, ttl: int = CACHE_TTL) -> bool:
         """Set prediction in cache with TTL"""
@@ -65,7 +67,7 @@ class PredictionCache:
         except Exception as e:
             logger.error(f"Error writing to cache: {e}")
             return False
-    
+
     @staticmethod
     def delete(player_name: str) -> bool:
         """Delete prediction from cache"""
@@ -77,7 +79,7 @@ class PredictionCache:
         except Exception as e:
             logger.error(f"Error deleting from cache: {e}")
             return False
-    
+
     @staticmethod
     def invalidate_all() -> bool:
         """Clear all prediction caches"""
@@ -97,7 +99,7 @@ def test_redis_connection() -> bool:
     """Test Redis connection"""
     try:
         redis_client.ping()
-        logger.info("✅ Redis connection successful")
+        logger.info(f"✅ Redis connection successful (SSL: {REDIS_SSL})")
         return True
     except Exception as e:
         logger.error(f"❌ Redis connection failed: {e}")

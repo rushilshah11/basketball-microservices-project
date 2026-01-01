@@ -1,0 +1,134 @@
+version: "3.8"
+
+services:
+  # 1. Eureka Server
+  eureka-server:
+    build:
+      context: ./eureka-server
+      args:
+        - JAR_FILE=target/eureka-server-0.0.1-SNAPSHOT.jar
+    container_name: bball_eureka_server
+    expose:
+      - "8761"
+    environment:
+      - EUREKA_INSTANCE_HOSTNAME=eureka-server
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    restart: always
+
+  # 2. Security Service
+  security-service:
+    build:
+      context: ./security
+      args:
+        - JAR_FILE=target/security-0.0.1-SNAPSHOT.jar
+    container_name: bball_security_service
+    expose:
+      - "8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      # Connect to AWS RDS
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_ENDPOINT}:5432/${DB_SECURITY_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      # Connect to AWS ElastiCache (with SSL)
+      - SPRING_DATA_REDIS_HOST=${REDIS_ENDPOINT}
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_SSL_ENABLED=true
+      # Auth Config
+      - APPLICATION_SECURITY_JWT_SECRET_KEY=${JWT_SECRET}
+      - APPLICATION_SECURITY_JWT_EXPIRATION=${JWT_EXPIRATION}
+      # Eureka
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+    depends_on:
+      - eureka-server
+    restart: always
+
+  # 3. Stats Service
+  stats-service:
+    build:
+      context: ./stats
+      args:
+        - JAR_FILE=target/stats-0.0.1-SNAPSHOT.jar
+    container_name: bball_stats_service
+    expose:
+      - "8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      # Connect to AWS RDS
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_ENDPOINT}:5432/${DB_STATS_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      # Connect to AWS ElastiCache (with SSL)
+      - SPRING_DATA_REDIS_HOST=${REDIS_ENDPOINT}
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_SSL_ENABLED=true
+      # Service Links
+      - NBA_API_BASE_URL=http://nba-fetcher:5001
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+    depends_on:
+      - eureka-server
+      - security-service
+    restart: always
+
+  # 4. NBA Fetcher
+  nba-fetcher:
+    build:
+      context: ./nba-fetcher
+    container_name: bball_nba_fetcher
+    expose:
+      - "5001"
+    restart: always
+
+  # 5. Prediction Service
+  prediction:
+    build:
+      context: ./prediction
+    container_name: bball_prediction
+    expose:
+      - "5002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Connect to AWS ElastiCache (with SSL)
+      - REDIS_HOST=${REDIS_ENDPOINT}
+      - REDIS_PORT=6379
+      - REDIS_SSL=true
+      # Connect to AWS RDS
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_PREDICTION_NAME}
+      # Service Links
+      - STATS_SERVICE_URL=http://stats-service:8081
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+      - stats-service
+    restart: always
+
+  # 6. API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: bball_gateway
+    ports:
+      - "8080:8080" # Exposed to public
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    restart: always
+
+  # 7. Frontend
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # For now, point to EC2 IP. Later, use a domain.
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: bball_frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - api-gateway
+    restart: always
