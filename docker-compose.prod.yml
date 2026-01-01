@@ -9,7 +9,7 @@ services:
         - JAR_FILE=target/eureka-server-0.0.1-SNAPSHOT.jar
     container_name: bball_eureka_server
     ports:
-      - "8761:8671"
+      - "8761:8761"
     environment:
       - EUREKA_INSTANCE_HOSTNAME=eureka-server
       - JAVA_TOOL_OPTIONS=-Xmx400m
