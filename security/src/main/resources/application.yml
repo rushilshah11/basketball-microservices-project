@@ -43,6 +43,7 @@ application:
 grpc:
   server:
     port: 9090
+    security: plaintext
 
 management:
   tracing:
