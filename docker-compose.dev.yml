@@ -151,6 +151,9 @@ services:
     container_name: bball_nba_fetcher
     expose:
       - "5001" # Expose port 5001
+    environment:
+      # Add this line so the Python script can find the Eureka server
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
     networks:
       - default
     restart: always
