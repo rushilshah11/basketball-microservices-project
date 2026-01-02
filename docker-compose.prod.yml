@@ -30,6 +30,7 @@ services:
     container_name: bball_security_service
     expose:
       - "8082"
+      - "9090"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_TOOL_OPTIONS=-Xmx400m
