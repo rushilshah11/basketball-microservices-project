@@ -41,7 +41,7 @@ services:
       # Connect to AWS ElastiCache (with SSL)
       - SPRING_DATA_REDIS_HOST=${REDIS_ENDPOINT}
       - SPRING_DATA_REDIS_PORT=6379
-      - SPRING_DATA_REDIS_SSL_ENABLED=true
+      - SPRING_DATA_REDIS_SSL_ENABLED=false
       # Auth Config
       - APPLICATION_SECURITY_JWT_SECRET_KEY=${JWT_SECRET}
       - APPLICATION_SECURITY_JWT_EXPIRATION=${JWT_EXPIRATION}
@@ -72,7 +72,7 @@ services:
       # Connect to AWS ElastiCache (with SSL)
       - SPRING_DATA_REDIS_HOST=${REDIS_ENDPOINT}
       - SPRING_DATA_REDIS_PORT=6379
-      - SPRING_DATA_REDIS_SSL_ENABLED=true
+      - SPRING_DATA_REDIS_SSL_ENABLED=false
       # Service Links
       - NBA_API_BASE_URL=http://nba-fetcher:5001
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
