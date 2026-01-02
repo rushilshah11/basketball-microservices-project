@@ -2,45 +2,35 @@ import asyncio
 from fastapi import FastAPI, HTTPException, Query
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo
+from nba_api.stats.library.http import NBAStatsHTTP
 from pydantic import BaseModel
 from typing import List, Optional
 import logging
 from logging.handlers import RotatingFileHandler
 import concurrent.futures
 import py_eureka_client.eureka_client as eureka_client
-
-from opentelemetry import trace
-from opentelemetry.exporter.zipkin.json import ZipkinExporter
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
 import os
+import sys
+import time
+import functools
+
+# Eureka configuration
 eureka_url = os.getenv('EUREKA_CLIENT_SERVICEURL_DEFAULTZONE')
 
-# --- NEW: Configure Tracer ---
-resource = Resource(attributes={
-    SERVICE_NAME: "nba-fetcher"  # This name will show up in Zipkin
-})
-
-zipkin_exporter = ZipkinExporter(
-    endpoint="http://zipkin:9411/api/v2/spans"
-)
-
-provider = TracerProvider(resource=resource)
-processor = BatchSpanProcessor(zipkin_exporter)
-provider.add_span_processor(processor)
-trace.set_tracer_provider(provider)
-
-# Instrument outgoing HTTP calls (nba_api uses 'requests' under the hood)
-RequestsInstrumentor().instrument()
+# Configure nba_api headers to avoid bot detection
+NBAStatsHTTP.headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Referer': 'https://www.nba.com/',
+    'Origin': 'https://www.nba.com',
+    'Connection': 'keep-alive',
+}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nba-fetcher")
-
-import sys
 
 # Audit logger - Configuration for Docker/AWS (Stdout)
 audit_logger = logging.getLogger("audit")
@@ -48,14 +38,30 @@ audit_logger.setLevel(logging.INFO)
 
 # Only add handler if not already present
 if not audit_logger.handlers:
-    # StreamHandler writes to sys.stderr (or sys.stdout) which Docker captures
     audit_handler = logging.StreamHandler(sys.stdout)
     audit_formatter = logging.Formatter('%(asctime)s [AUDIT] %(message)s')
     audit_handler.setFormatter(audit_formatter)
     audit_logger.addHandler(audit_handler)
 
 app = FastAPI(title="NBA Fetcher Microservice")
-FastAPIInstrumentor.instrument_app(app)
+
+# Rate limiting decorator to avoid overwhelming NBA API
+def rate_limit(min_interval=1.5):
+    """Decorator to rate limit function calls"""
+    def decorator(func):
+        last_called = [0.0]
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            elapsed = time.time() - last_called[0]
+            left_to_wait = min_interval - elapsed
+            if left_to_wait > 0:
+                time.sleep(left_to_wait)
+            ret = func(*args, **kwargs)
+            last_called[0] = time.time()
+            return ret
+        return wrapper
+    return decorator
 
 # --- Helper Functions ---
 def get_player_id_by_name(full_name: str):
@@ -64,10 +70,12 @@ def get_player_id_by_name(full_name: str):
         return None
     return matches[0]['id']
 
+@rate_limit(min_interval=1.5)
 def fetch_player_data_with_team(name: str):
     """
     Helper to fetch both ID and Team Name for a single player.
     Used by the batch endpoint in parallel.
+    Rate limited to avoid API throttling.
     """
     try:
         matches = players.find_players_by_full_name(name)
@@ -78,25 +86,24 @@ def fetch_player_data_with_team(name: str):
         player_id = data['id']
 
         # Fetch Team Info
-        # This is the slow part, so we run it in parallel threads
         team_name = "Free Agent"
         position = "N/A"
         try:
-            info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
+            info = commonplayerinfo.CommonPlayerInfo(player_id=player_id, timeout=60)
             df = info.get_data_frames()[0]
             if not df.empty:
                 if 'POSITION' in df.columns:
                     position = str(df.iloc[0]['POSITION'])
                 city = str(df.iloc[0]['TEAM_CITY'])
                 nickname = str(df.iloc[0]['TEAM_NAME'])
+
                 # Combine city + name (e.g., "Los Angeles Lakers")
-                # Check if 'city' is empty or null to avoid "nan Lakers"
                 if city and city.lower() != 'nan':
                     team_name = f"{city} {nickname}"
                 else:
                     team_name = nickname
-        except Exception:
-            logger.warning(f"Could not fetch team for {name}")
+        except Exception as e:
+            logger.warning(f"Could not fetch team for {name}: {e}")
 
         return {
             "id": player_id,
@@ -165,6 +172,7 @@ def search_players_with_teams(query: str):
         audit_logger.info(f"request|service=nba-fetcher|path=/players/search|q={query}")
     except Exception:
         pass
+
     # 1. Find all matching players (regex based)
     matches = players.find_players_by_full_name(query)
     matches = [p for p in matches if p['is_active']]
@@ -173,8 +181,8 @@ def search_players_with_teams(query: str):
     top_matches = matches[:5]
 
     results = []
-    # 3. Fetch team data for all 5 in parallel (reusing your existing helper)
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    # 3. Fetch team data for all 5 in parallel (with rate limiting)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         future_to_name = {
             executor.submit(fetch_player_data_with_team, p['full_name']): p['full_name']
             for p in top_matches
@@ -197,10 +205,11 @@ def get_players_batch(request: BatchRequest):
         audit_logger.info(f"request|service=nba-fetcher|path=/players/batch|count={len(request.names)}")
     except Exception:
         pass
+
     results = []
     # Use ThreadPoolExecutor to run API calls in parallel
-    # This makes fetching 10 players take ~1 second instead of ~10 seconds
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # Reduced workers to 3 to avoid rate limiting
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         # Submit all tasks
         future_to_name = {
             executor.submit(fetch_player_data_with_team, name): name
@@ -217,13 +226,14 @@ def get_players_batch(request: BatchRequest):
 
 # 3. Get Player Team
 @app.get("/player/{full_name}/team")
+@rate_limit(min_interval=1.5)
 def get_player_team(full_name: str):
     player_id = get_player_id_by_name(full_name)
     if not player_id:
         raise HTTPException(status_code=404, detail="Player not found")
 
     try:
-        info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
+        info = commonplayerinfo.CommonPlayerInfo(player_id=player_id, timeout=60)
         df = info.get_data_frames()[0]
         if df.empty:
             raise HTTPException(status_code=404, detail="No team info found")
@@ -241,13 +251,14 @@ def get_player_team(full_name: str):
 
 # 4. Get Season Averages
 @app.get("/player/{full_name}/stats")
+@rate_limit(min_interval=1.5)
 def get_player_season_averages(full_name: str):
     player_id = get_player_id_by_name(full_name)
     if not player_id:
         raise HTTPException(status_code=404, detail="Player not found")
 
     try:
-        career = playercareerstats.PlayerCareerStats(player_id=player_id)
+        career = playercareerstats.PlayerCareerStats(player_id=player_id, timeout=60)
         df = career.get_data_frames()[0]
 
         if df.empty:
@@ -268,7 +279,6 @@ def get_player_season_averages(full_name: str):
                 "freeThrowPercentage": 0.0
             }
 
-        # UPDATED: Changed keys to match Frontend & Added Percentages (x100 for display)
         return {
             "season": str(latest['SEASON_ID']),
             "gamesPlayed": games,
@@ -286,13 +296,14 @@ def get_player_season_averages(full_name: str):
 
 # 5. Get Last N Games
 @app.get("/player/{full_name}/games")
+@rate_limit(min_interval=1.5)
 def get_player_game_log(full_name: str, limit: int = Query(5, ge=1, le=82)):
     player_id = get_player_id_by_name(full_name)
     if not player_id:
         raise HTTPException(status_code=404, detail="Player not found")
 
     try:
-        gamelog = playergamelog.PlayerGameLog(player_id=player_id)
+        gamelog = playergamelog.PlayerGameLog(player_id=player_id, timeout=60)
         df = gamelog.get_data_frames()[0]
 
         if df.empty:
