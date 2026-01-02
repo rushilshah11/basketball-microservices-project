@@ -2,11 +2,9 @@ import asyncio
 from fastapi import FastAPI, HTTPException, Query
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo
-from nba_api.stats.library.http import NBAStatsHTTP
 from pydantic import BaseModel
 from typing import List, Optional
 import logging
-from logging.handlers import RotatingFileHandler
 import concurrent.futures
 import py_eureka_client.eureka_client as eureka_client
 import os
@@ -16,17 +14,6 @@ import functools
 
 # Eureka configuration
 eureka_url = os.getenv('EUREKA_CLIENT_SERVICEURL_DEFAULTZONE')
-
-# Configure nba_api headers to avoid bot detection
-NBAStatsHTTP.headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Referer': 'https://www.nba.com/',
-    'Origin': 'https://www.nba.com',
-    'Connection': 'keep-alive',
-}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,8 +32,23 @@ if not audit_logger.handlers:
 
 app = FastAPI(title="NBA Fetcher Microservice")
 
+# Custom headers to avoid bot detection
+# Based on nba_api documentation - pass these to each endpoint call
+CUSTOM_HEADERS = {
+    'Host': 'stats.nba.com',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Referer': 'https://www.nba.com/',
+    'Origin': 'https://www.nba.com',
+    'x-nba-stats-token': 'true',
+    'x-nba-stats-origin': 'stats',
+}
+
 # Rate limiting decorator to avoid overwhelming NBA API
-def rate_limit(min_interval=1.5):
+def rate_limit(min_interval=2.0):
     """Decorator to rate limit function calls"""
     def decorator(func):
         last_called = [0.0]
@@ -70,7 +72,7 @@ def get_player_id_by_name(full_name: str):
         return None
     return matches[0]['id']
 
-@rate_limit(min_interval=1.5)
+@rate_limit(min_interval=2.0)
 def fetch_player_data_with_team(name: str):
     """
     Helper to fetch both ID and Team Name for a single player.
@@ -85,11 +87,16 @@ def fetch_player_data_with_team(name: str):
         data = matches[0]
         player_id = data['id']
 
-        # Fetch Team Info
+        # Fetch Team Info with custom headers
         team_name = "Free Agent"
         position = "N/A"
         try:
-            info = commonplayerinfo.CommonPlayerInfo(player_id=player_id, timeout=60)
+            # Pass custom headers and increased timeout
+            info = commonplayerinfo.CommonPlayerInfo(
+                player_id=player_id,
+                headers=CUSTOM_HEADERS,
+                timeout=100
+            )
             df = info.get_data_frames()[0]
             if not df.empty:
                 if 'POSITION' in df.columns:
@@ -182,7 +189,7 @@ def search_players_with_teams(query: str):
 
     results = []
     # 3. Fetch team data for all 5 in parallel (with rate limiting)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_name = {
             executor.submit(fetch_player_data_with_team, p['full_name']): p['full_name']
             for p in top_matches
@@ -208,8 +215,8 @@ def get_players_batch(request: BatchRequest):
 
     results = []
     # Use ThreadPoolExecutor to run API calls in parallel
-    # Reduced workers to 3 to avoid rate limiting
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    # Reduced workers to 2 to avoid rate limiting
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         # Submit all tasks
         future_to_name = {
             executor.submit(fetch_player_data_with_team, name): name
@@ -226,14 +233,18 @@ def get_players_batch(request: BatchRequest):
 
 # 3. Get Player Team
 @app.get("/player/{full_name}/team")
-@rate_limit(min_interval=1.5)
+@rate_limit(min_interval=2.0)
 def get_player_team(full_name: str):
     player_id = get_player_id_by_name(full_name)
     if not player_id:
         raise HTTPException(status_code=404, detail="Player not found")
 
     try:
-        info = commonplayerinfo.CommonPlayerInfo(player_id=player_id, timeout=60)
+        info = commonplayerinfo.CommonPlayerInfo(
+            player_id=player_id,
+            headers=CUSTOM_HEADERS,
+            timeout=100
+        )
         df = info.get_data_frames()[0]
         if df.empty:
             raise HTTPException(status_code=404, detail="No team info found")
@@ -251,14 +262,19 @@ def get_player_team(full_name: str):
 
 # 4. Get Season Averages
 @app.get("/player/{full_name}/stats")
-@rate_limit(min_interval=1.5)
+@rate_limit(min_interval=2.0)
 def get_player_season_averages(full_name: str):
     player_id = get_player_id_by_name(full_name)
     if not player_id:
         raise HTTPException(status_code=404, detail="Player not found")
 
     try:
-        career = playercareerstats.PlayerCareerStats(player_id=player_id, timeout=60)
+        # Pass custom headers and increased timeout
+        career = playercareerstats.PlayerCareerStats(
+            player_id=player_id,
+            headers=CUSTOM_HEADERS,
+            timeout=100
+        )
         df = career.get_data_frames()[0]
 
         if df.empty:
@@ -296,14 +312,19 @@ def get_player_season_averages(full_name: str):
 
 # 5. Get Last N Games
 @app.get("/player/{full_name}/games")
-@rate_limit(min_interval=1.5)
+@rate_limit(min_interval=2.0)
 def get_player_game_log(full_name: str, limit: int = Query(5, ge=1, le=82)):
     player_id = get_player_id_by_name(full_name)
     if not player_id:
         raise HTTPException(status_code=404, detail="Player not found")
 
     try:
-        gamelog = playergamelog.PlayerGameLog(player_id=player_id, timeout=60)
+        # Pass custom headers and increased timeout
+        gamelog = playergamelog.PlayerGameLog(
+            player_id=player_id,
+            headers=CUSTOM_HEADERS,
+            timeout=100
+        )
         df = gamelog.get_data_frames()[0]
 
         if df.empty:
