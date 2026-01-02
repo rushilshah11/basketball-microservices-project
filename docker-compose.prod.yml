@@ -80,11 +80,8 @@ services:
       - NBA_API_BASE_URL=http://nba-fetcher:5001
       - SPRING_APPLICATION_JSON={"eureka":{"client":{"serviceUrl":{"defaultZone":"http://eureka-server:8761/eureka/"}}}}
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
-      # Use both common naming patterns to ensure the override hits
-      - GRPC_CLIENT_SECURITY_SERVICE_NEGOTIATION_TYPE=plaintext
-      - GRPC_CLIENT_SECURITY_SERVICE_ADDRESS=static://security-service:9090
-      # Also add this as a fallback
-      - GRPC_CLIENT_GLOBAL_NEGOTIATION_TYPE=plaintext
+      - GRPC_CLIENT_SECURITYSERVICE_ADDRESS=static://security-service:9090
+      - GRPC_CLIENT_SECURITYSERVICE_NEGOTIATIONTYPE=PLAINTEXT
     depends_on:
       eureka-server:
         condition: service_healthy
