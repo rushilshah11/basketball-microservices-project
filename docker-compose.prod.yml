@@ -80,6 +80,8 @@ services:
       - NBA_API_BASE_URL=http://nba-fetcher:5001
       - SPRING_APPLICATION_JSON={"eureka":{"client":{"serviceUrl":{"defaultZone":"http://eureka-server:8761/eureka/"}}}}
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - GRPC_CLIENT_SECURITY_SERVICE_NEGOTIATION_TYPE=plaintext
+      - GRPC_CLIENT_SECURITY_SERVICE_ADDRESS=static://security-service:9090
     depends_on:
       eureka-server:
         condition: service_healthy
