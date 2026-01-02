@@ -97,7 +97,7 @@ services:
       context: ./nba-fetcher
     container_name: bball_nba_fetcher
     environment:
-      - EUREKA_SERVER=http://eureka-server:8761/eureka/
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - INSTANCE_HOST=bball_nba_fetcher
       - REGION=default
     expose:
