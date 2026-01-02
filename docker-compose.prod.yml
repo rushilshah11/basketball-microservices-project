@@ -82,8 +82,9 @@ services:
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       # Use both common naming patterns to ensure the override hits
       - GRPC_CLIENT_SECURITY_SERVICE_NEGOTIATION_TYPE=plaintext
-      - GRPC_CLIENT_SECURITY_NEGOTIATION_TYPE=plaintext
       - GRPC_CLIENT_SECURITY_SERVICE_ADDRESS=static://security-service:9090
+      # Also add this as a fallback
+      - GRPC_CLIENT_GLOBAL_NEGOTIATION_TYPE=plaintext
     depends_on:
       eureka-server:
         condition: service_healthy
