@@ -27,13 +27,13 @@ spring:
       routes:
         # 1. Route to Security Service
         - id: security-service
-          uri: lb://SECURITY-SERVICE  # 'lb' means Load Balanced via Eureka
+          uri: lb://security-service  # 'lb' means Load Balanced via Eureka
           predicates:
             - Path=/api/v1/auth/** # Login/Register endpoints
 
         # 2. Route to Stats Service (Players & Watchlists)
         - id: stats-service
-          uri: lb://STATS-SERVICE
+          uri: lb://stats-service
           predicates:
             - Path=/api/players/**, /api/watchlists/**
           filters:
@@ -45,7 +45,7 @@ spring:
 
         # 3. Route to Prediction Service
         - id: prediction-service
-          uri: lb://PREDICTION-SERVICE
+          uri: lb://prediction-service
           predicates:
             - Path=/api/predict/**, /api/predictions/**, /api/model/**, /api/training/**, /api/cache/**
           filters:
@@ -61,7 +61,7 @@ spring:
         # 4. Route to NBA Fetcher (Internal use mostly, but good for debugging)
         # We strip the prefix so /nba/player/LeBron -> NBA-FETCHER/player/LeBron
         - id: nba-fetcher
-          uri: lb://NBA-FETCHER
+          uri: lb://nba-fetcher
           predicates:
             - Path=/nba/**
           filters:
