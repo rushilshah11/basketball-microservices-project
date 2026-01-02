@@ -1,0 +1,87 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: stats-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bball-stats
+    driver-class-name: org.postgresql.Driver
+    username: user
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000 # 1 hour in milliseconds
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/ # Better default for Docker
+  instance:
+    prefer-ip-address: true      # IMPORTANT: Use IP so Gateway can find it
+
+# NBA API Configuration
+nba:
+  api:
+    base-url: ${NBA_API_URL:http://localhost:5000}
+
+grpc:
+  client:
+    security-service:
+      address: static://${SECURITY_SERVICE_HOST:security-service}:${SECURITY_SERVICE_PORT:9090}
+      negotiationType: PLAINTEXT
+      enableKeepAlive: true
+      keepAliveWithoutCalls: true
+
+# In stats/src/main/resources/application.yml
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      nbaFetcher:
+        registerHealthIndicator: true
+        slidingWindowSize: 10          # Check last 10 calls
+        failureRateThreshold: 50       # Open circuit if 50% fail
+        waitDurationInOpenState: 5s    # Wait 5s before trying again
+        permittedNumberOfCallsInHalfOpenState: 3
+      predictionService:
+        registerHealthIndicator: true
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+
+  ratelimiter:
+    instances:
+      nbaFetcher:
+        limitForPeriod: 15             # Allow 10 calls...
+        limitRefreshPeriod: 1s
+        timeoutDuration: 1s             # Fail immediately if limit reached (don't wait)
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # Log 100% of requests for development
+  zipkin:
+    tracing:
+      endpoint: "http://zipkin:9411/api/v2/spans"
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus # Enable the /prometheus endpoint
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
