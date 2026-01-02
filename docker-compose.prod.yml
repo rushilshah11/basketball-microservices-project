@@ -126,6 +126,9 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=-Xmx400m
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_DATA_REDIS_HOST=${REDIS_ENDPOINT}
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_SSL_ENABLED=false
     depends_on:
       - eureka-server
     restart: always
