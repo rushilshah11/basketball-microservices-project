@@ -75,7 +75,7 @@ services:
       - SPRING_DATA_REDIS_SSL_ENABLED=false
       # Service Links
       - NBA_API_BASE_URL=http://nba-fetcher:5001
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_APPLICATION_JSON={"eureka":{"client":{"serviceUrl":{"defaultZone":"http://eureka-server:8761/eureka/"}}}}
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
     depends_on:
       eureka-server:
@@ -105,7 +105,7 @@ services:
       # Connect to AWS ElastiCache (with SSL)
       - REDIS_HOST=${REDIS_ENDPOINT}
       - REDIS_PORT=6379
-      - REDIS_SSL=true
+      - REDIS_SSL=false
       # Connect to AWS RDS
       - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_PREDICTION_NAME}
       # Service Links
