@@ -1,1 +1,23 @@
+# Dependencies
+node_modules/
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+
+# Environments
 .env
+.env.*
+
+# Python bytecode/cache
+**/__pycache__/
+**/*.pyc
+
+# Build outputs (if not covered by sub-gitignores)
+target/
+build/
+.next/
