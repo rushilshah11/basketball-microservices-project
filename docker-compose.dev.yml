@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_security_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U LeDB -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", 'pg_isready -U LeDB -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,7 +33,7 @@ services:
     volumes:
       - postgres_stats_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U LeDB -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", 'pg_isready -U LeDB -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,7 +52,7 @@ services:
     volumes:
       - postgres_prediction_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U LeDB -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", 'pg_isready -U LeDB -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -206,8 +206,13 @@ services:
       - "8080:8080" # Expose ONLY this port to the world
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
     depends_on:
       eureka-server:
+        condition: service_started
+      redis:
         condition: service_started
     restart: always
 

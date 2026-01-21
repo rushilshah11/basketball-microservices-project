@@ -12,9 +12,12 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -34,6 +37,45 @@ public class WatchlistService {
         return watchlists.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    private final RestTemplate restTemplate;
+    public WatchlistResponse addPlayerToWatchlistSync(Integer userId, String playerName) {
+        // 1. Save to DB (Primary task)
+        var watchlist = Watchlist.builder()
+                .userId(userId)
+                .playerName(playerName)
+                .addedAt(LocalDateTime.now())
+                .build();
+        Watchlist savedWatchlist = repository.save(watchlist);
+
+        // 2. SIMULATED BLOCKING CALL: Wait for prediction service
+        try {
+            String predictionUrl = "http://prediction-service:5002/predict";
+
+            // Construct the payload the Python service expects
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("playerName", playerName);
+
+            // The Python service expects a 'currentStats' object
+            // We provide dummy stats just to trigger the ML inference delay
+            Map<String, Object> dummyStats = new HashMap<>();
+            dummyStats.put("ppg", 20.0);
+            dummyStats.put("apg", 5.0);
+            dummyStats.put("rpg", 5.0);
+            dummyStats.put("gamesPlayed", 50);
+            requestBody.put("currentStats", dummyStats);
+
+            // This call BLOCKS the thread until the Python service responds
+            // We use Object.class because we only care about the delay, not the data
+            restTemplate.postForObject(predictionUrl, requestBody, Object.class);
+
+            log.info("Synchronous prediction completed for {}", playerName);
+        } catch (Exception e) {
+            log.error("Sync prediction call failed: {}", e.getMessage());
+        }
+
+        return mapToResponse(savedWatchlist, "Synchronous add complete");
     }
 
     @Caching(evict = {
@@ -179,4 +221,5 @@ public class WatchlistService {
         }
         return lastFetch.isBefore(LocalDateTime.now().minusHours(6));
     }
+
 }

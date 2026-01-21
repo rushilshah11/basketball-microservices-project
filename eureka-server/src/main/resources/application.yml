@@ -7,7 +7,8 @@ spring:
 
 eureka:
   instance:
-    hostname: localhost
+    hostname: eureka-server
+    prefer-ip-address: false
   client:
     # This server is the registry, so it shouldn't register itself
     register-with-eureka: false
@@ -19,9 +20,10 @@ eureka:
     enable-self-preservation: false
     # Response cache update interval (in ms)
     response-cache-update-interval-ms: 1000
+    # Allow new service registrations
+    eviction-interval-timer-in-ms: 5000
 
 logging:
   level:
     com.netflix.eureka: INFO
     com.netflix.discovery: INFO
-

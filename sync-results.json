@@ -1,0 +1,168 @@
+{
+    "metrics": {
+        "group_duration": {
+            "avg": 106.36019121900712,
+            "min": 100.375542,
+            "med": 103.55947900000001,
+            "max": 206.181708,
+            "p(90)": 111.7887956,
+            "p(95)": 121.66887709999992
+        },
+        "iteration_duration": {
+            "max": 206.9,
+            "p(90)": 111.8469916,
+            "p(95)": 121.74092854999995,
+            "avg": 106.40267500560296,
+            "min": 100.386416,
+            "med": 103.6125
+        },
+        "iterations": {
+            "count": 14100,
+            "rate": 469.5100349778316
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "avg": 0.015326737588652481,
+            "min": 0,
+            "med": 0,
+            "max": 8.015,
+            "p(90)": 0
+        },
+        "http_req_blocked": {
+            "min": 0,
+            "med": 0.002,
+            "max": 14.667,
+            "p(90)": 0.005,
+            "p(95)": 0.007,
+            "avg": 0.04819510638296289
+        },
+        "http_reqs": {
+            "count": 14100,
+            "rate": 469.5100349778316
+        },
+        "http_req_duration": {
+            "max": 83.472,
+            "p(90)": 10.9983,
+            "p(95)": 20.82444999999998,
+            "avg": 5.775439645390076,
+            "min": 0.311,
+            "med": 3.05
+        },
+        "errors": {
+            "passes": 13460,
+            "fails": 640,
+            "value": 0.9546099290780142
+        },
+        "http_req_sending": {
+            "avg": 0.03757539007091944,
+            "min": 0.002,
+            "med": 0.009,
+            "max": 7.832,
+            "p(90)": 0.035,
+            "p(95)": 0.079
+        },
+        "latency": {
+            "avg": 5.775439645390076,
+            "min": 0.311,
+            "med": 3.05,
+            "max": 83.472,
+            "p(90)": 10.9983,
+            "p(95)": 20.82444999999998
+        },
+        "data_received": {
+            "count": 3844030,
+            "rate": 128000.75601105206
+        },
+        "http_req_failed": {
+            "passes": 13460,
+            "fails": 640,
+            "value": 0.9546099290780142
+        },
+        "data_sent": {
+            "count": 5566924,
+            "rate": 185370.6866637539
+        },
+        "checks": {
+            "passes": 14740,
+            "fails": 13460,
+            "value": 0.5226950354609929
+        },
+        "vus": {
+            "value": 50,
+            "min": 50,
+            "max": 50
+        },
+        "success": {
+            "passes": 640,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_receiving": {
+            "med": 0.017,
+            "max": 9.501,
+            "p(90)": 0.052,
+            "p(95)": 0.087,
+            "avg": 0.042350992907800006,
+            "min": 0.004
+        },
+        "http_req_tls_handshaking": {
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 41.06159062500003,
+            "min": 19.282,
+            "med": 39.352999999999994,
+            "max": 83.472,
+            "p(90)": 56.130700000000004,
+            "p(95)": 71.1818
+        },
+        "vus_max": {
+            "value": 50,
+            "min": 50,
+            "max": 50
+        },
+        "http_req_waiting": {
+            "avg": 5.6955132624113185,
+            "min": 0.289,
+            "med": 2.982,
+            "max": 81.463,
+            "p(90)": 10.8801,
+            "p(95)": 20.578349999999993
+        }
+    },
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "sync_watchlist_add": {
+                "name": "sync_watchlist_add",
+                "path": "::sync_watchlist_add",
+                "id": "fb66984248e8fa5cb014ff488366be4c",
+                "groups": {},
+                "checks": {
+                        "status is 201": {
+                            "name": "status is 201",
+                            "path": "::sync_watchlist_add::status is 201",
+                            "id": "6a5a8e21c66f1c9159f68234ffdac56a",
+                            "passes": 640,
+                            "fails": 13460
+                        },
+                        "response time < 700ms": {
+                            "name": "response time < 700ms",
+                            "path": "::sync_watchlist_add::response time < 700ms",
+                            "id": "151ae3874ae3a0692f77ad2b3abbb165",
+                            "passes": 14100,
+                            "fails": 0
+                        }
+                    }
+            }
+        },
+        "checks": {},
+        "name": "",
+        "path": ""
+    }
+}
