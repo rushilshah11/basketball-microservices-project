@@ -30,12 +30,12 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    """Response with prediction - what API returns after prediction"""
-    playerName: str  # Player name from request
-    predictedPoints: float  # Expected points in next game
-    predictedAssists: float  # Expected assists in next game
-    predictedRebounds: float  # Expected rebounds in next game
-    confidence: float  # How confident the model is (0.0-1.0)
+    """Response with prediction - standardized format for both POST and GET endpoints"""
+    id: Optional[int] = None  # Database record ID (only for stored predictions)
+    player_name: str  # Player name
+    predicted_stats: dict  # JSON object with predicted values (pts, ast, reb)
+    confidence: float  # Model confidence score
+    created_at: Optional[datetime] = None  # When prediction was created
 
 
 class BatchPredictionRequest(BaseModel):

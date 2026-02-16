@@ -56,7 +56,7 @@ def predict_performance(ppg: float, apg: float, rpg: float) -> tuple:
         Tuple of (predicted_points, predicted_assists, predicted_rebounds, confidence)
     """
     # TODO: Implement XGBoost model here - for now return placeholder values
-    return 0.0, 0.0, 0.0, 0.0
+    return 10.0, 10.0, 10.0, 10.0
 
 
 # ============================================
@@ -178,13 +178,13 @@ def predict(request: PredictionRequest, db: Session = Depends(get_db)):
         result = new_prediction.to_dict()
         PredictionCache.set(request.playerName, result)
         
-        # Return prediction response with validated data
+        # Return prediction response in standardized format (same as GET endpoint)
         return PredictionResponse(
-            playerName=request.playerName,
-            predictedPoints=predicted_pts,
-            predictedAssists=predicted_ast,
-            predictedRebounds=predicted_reb,
-            confidence=confidence
+            id=new_prediction.id,
+            player_name=request.playerName,
+            predicted_stats=predicted_stats,
+            confidence=confidence,
+            created_at=new_prediction.created_at
         )
     except Exception as e:
         logger.error(f"Error: {e}")
