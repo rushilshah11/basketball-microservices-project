@@ -34,7 +34,6 @@ if not audit_logger.handlers:
     audit_logger.addHandler(audit_handler)
 
 app = FastAPI(title="NBA Fetcher Microservice")
-FastAPIInstrumentor.instrument_app(app)
 
 # --- Helper Functions ---
 def get_player_id_by_name(full_name: str):

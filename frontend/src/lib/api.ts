@@ -261,16 +261,16 @@ export async function getWatchlist(
 // --- Prediction API ---
 
 function transformPredictionResponse(data: any): Prediction {
-  // Handle both camelCase (direct endpoint) and snake_case (database format)
-  const predictedStats = data.predicted_stats || {};
+  const stats = data.predicted_stats || {};
 
   return {
-    playerName: data.playerName || data.player_name || "",
-    predictedPoints: data.predictedPoints ?? predictedStats.pts ?? 0,
-    predictedAssists: data.predictedAssists ?? predictedStats.ast ?? 0,
-    predictedRebounds: data.predictedRebounds ?? predictedStats.reb ?? 0,
+    playerName: data.player_name || data.playerName || "",
+    // Ensure we check the nested 'stats' object correctly
+    predictedPoints: data.predictedPoints ?? stats.points ?? 0,
+    predictedAssists: data.predictedAssists ?? stats.assists ?? 0,
+    predictedRebounds: data.predictedRebounds ?? stats.rebounds ?? 0,
     confidence: data.confidence ?? 0,
-    createdAt: data.createdAt || data.created_at || new Date().toISOString(),
+    createdAt: data.created_at || data.createdAt || new Date().toISOString(),
   };
 }
 
