@@ -265,21 +265,91 @@ function transformPredictionResponse(data: any): Prediction {
 
   return {
     playerName: data.player_name || data.playerName || "",
-    // Ensure we check the nested 'stats' object correctly
-    predictedPoints: data.predictedPoints ?? stats.points ?? 0,
-    predictedAssists: data.predictedAssists ?? stats.assists ?? 0,
-    predictedRebounds: data.predictedRebounds ?? stats.rebounds ?? 0,
+    // FIXED: Backend sends predicted_stats as {pts, ast, reb} not {points, assists, rebounds}
+    predictedPoints: stats.pts ?? 0,
+    predictedAssists: stats.ast ?? 0,
+    predictedRebounds: stats.reb ?? 0,
     confidence: data.confidence ?? 0,
     createdAt: data.created_at || data.createdAt || new Date().toISOString(),
   };
 }
 
 export async function getPrediction(playerName: string): Promise<Prediction> {
-  // Endpoint: /api/predictions/{name}
-  const data = await fetchAPI<any>(
-    `predictions/${encodeURIComponent(playerName)}`,
-  );
-  return transformPredictionResponse(data);
+  try {
+    // Try to get existing prediction first
+    const data = await fetchAPI<any>(
+      `predictions/${encodeURIComponent(playerName)}`,
+    );
+    return transformPredictionResponse(data);
+  } catch (error: any) {
+    // Check if this is a 404 or "not found" error
+    const errorStr = (error.message || "").toLowerCase();
+    const is404 =
+      errorStr.includes("404") ||
+      errorStr.includes("not found") ||
+      errorStr.includes("no prediction");
+
+    if (is404) {
+      console.log(`No prediction found for ${playerName}, creating one...`);
+
+      try {
+        // Get player stats first
+        const stats = await getPlayerStats(playerName);
+
+        // Create prediction using POST /predict endpoint
+        const predictionRequest = {
+          playerName,
+          currentStats: {
+            ppg: stats.pointsPerGame,
+            apg: stats.assistsPerGame,
+            rpg: stats.reboundsPerGame,
+            fgPct: stats.fieldGoalPercentage / 100,
+            ftPct: stats.freeThrowPercentage / 100,
+            gamesPlayed: stats.gamesPlayed,
+            minutesPerGame: 30.0,
+            stealsPerGame: 1.0,
+            blocksPerGame: 0.5,
+            turnoversPerGame: 2.0,
+          },
+          homeGame: true,
+        };
+
+        console.log(`Creating prediction for ${playerName}...`);
+        // Call POST /predict to create the prediction
+        const newPrediction = await fetchAPI<any>("predict", {
+          method: "POST",
+          body: JSON.stringify(predictionRequest),
+        });
+
+        console.log(`✅ Prediction created for ${playerName}`);
+        return transformPredictionResponse(newPrediction);
+      } catch (createError: any) {
+        console.error(
+          `Failed to create prediction for ${playerName}:`,
+          createError,
+        );
+        // Return a placeholder if creation fails
+        return {
+          playerName,
+          predictedPoints: 0,
+          predictedAssists: 0,
+          predictedRebounds: 0,
+          confidence: 0,
+          createdAt: new Date().toISOString(),
+        };
+      }
+    }
+    // If it's not a 404 error, return a placeholder
+    console.error(`Error fetching prediction for ${playerName}:`, error);
+    return {
+      playerName,
+      predictedPoints: 0,
+      predictedAssists: 0,
+      predictedRebounds: 0,
+      confidence: 0,
+      createdAt: new Date().toISOString(),
+    };
+  }
 }
 
 export async function getPredictionsBatch(
@@ -287,31 +357,36 @@ export async function getPredictionsBatch(
 ): Promise<Record<string, Prediction>> {
   const predictions: Record<string, Prediction> = {};
 
-  // Batch requests in groups of 10 to avoid overwhelming the service
-  for (let i = 0; i < playerNames.length; i += 10) {
-    const batch = playerNames.slice(i, i + 10);
+  // Process in smaller batches to avoid timeout
+  for (let i = 0; i < playerNames.length; i += 3) {
+    const batch = playerNames.slice(i, i + 3);
 
     try {
       const results = await Promise.all(
         batch.map((name) =>
-          fetchAPI<any>(`predictions/${encodeURIComponent(name)}`).catch(
-            (err) => {
-              console.warn(`Failed to get prediction for ${name}:`, err);
-              return null;
-            },
-          ),
+          getPrediction(name).catch((err) => {
+            console.warn(`Failed to get prediction for ${name}:`, err);
+            return {
+              playerName: name,
+              predictedPoints: 0,
+              predictedAssists: 0,
+              predictedRebounds: 0,
+              confidence: 0,
+              createdAt: new Date().toISOString(),
+            };
+          }),
         ),
       );
 
       batch.forEach((name, idx) => {
         if (results[idx]) {
-          predictions[name] = transformPredictionResponse(results[idx]);
+          predictions[name] = results[idx];
         }
       });
 
-      // Small delay between batches to respect rate limits
-      if (i + 10 < playerNames.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      // Small delay between batches
+      if (i + 3 < playerNames.length) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
     } catch (err) {
       console.error("Batch prediction failed:", err);
