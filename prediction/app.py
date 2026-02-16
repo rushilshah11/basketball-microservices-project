@@ -10,7 +10,10 @@ import requests
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
 import py_eureka_client.eureka_client as eureka_client
+
+# Get Eureka URL from environment - this is crucial
 eureka_url = os.getenv('EUREKA_CLIENT_SERVICEURL_DEFAULTZONE')
+print(f"DEBUG: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE = {eureka_url}")
 
 # Import configuration and models
 from config import LOG_LEVEL
@@ -64,11 +67,16 @@ def predict_performance(ppg: float, apg: float, rpg: float) -> tuple:
 async def startup():
     """Called when app starts - initialize database and test cache connection"""
     logger.info("Starting prediction service...")
+    logger.info(f"Eureka URL: {eureka_url}")
     init_db()  # Create database tables if they don't exist
     test_redis_connection()  # Test if Redis is accessible
     
     # Register with Eureka service discovery
-    asyncio.create_task(register_with_eureka())
+    if eureka_url:
+        logger.info("Creating Eureka registration task...")
+        asyncio.create_task(register_with_eureka())
+    else:
+        logger.warning("EUREKA_CLIENT_SERVICEURL_DEFAULTZONE not set - skipping Eureka registration")
     
     logger.info("Service started successfully")
 
@@ -84,7 +92,8 @@ async def register_with_eureka():
             await eureka_client.init_async(
                 eureka_server=eureka_url,
                 app_name="PREDICTION-SERVICE",
-                instance_port=5002
+                instance_port=5002,
+                instance_host="prediction"
             )
             logger.info("✅ Successfully registered with Eureka!")
             break  # Exit loop on success
@@ -136,8 +145,8 @@ def root():
 # ============================================
 
 @app.post("/predict", response_model=PredictionResponse)
-def predict(request: PredictionRequest):
-    """Get a prediction for a single player"""
+def predict(request: PredictionRequest, db: Session = Depends(get_db)):
+    """Get a prediction for a single player and save to database"""
     logger.info(f"Prediction request for: {request.playerName}")
     
     try:
@@ -147,6 +156,27 @@ def predict(request: PredictionRequest):
             request.currentStats.apg,
             request.currentStats.rpg
         )
+        
+        # Save prediction to database
+        predicted_stats = {
+            "pts": predicted_pts,
+            "ast": predicted_ast,
+            "reb": predicted_reb
+        }
+        
+        new_prediction = PlayerPrediction(
+            player_name=request.playerName,
+            predicted_stats=predicted_stats,
+            confidence=confidence
+        )
+        db.add(new_prediction)
+        db.commit()
+        db.refresh(new_prediction)
+        logger.info(f"✅ Prediction saved to database for {request.playerName}")
+        
+        # Cache the prediction
+        result = new_prediction.to_dict()
+        PredictionCache.set(request.playerName, result)
         
         # Return prediction response with validated data
         return PredictionResponse(
