@@ -53,6 +53,19 @@ spring:
                 redis-rate-limiter.replenishRate: 20
                 redis-rate-limiter.burstCapacity: 40
                 key-resolver: "#{@ipKeyResolver}"
+
+        # Prediction Service proxy route (needs to come AFTER stats-proxy for specificity)
+        - id: prediction-proxy
+          uri: lb://prediction-service
+          predicates:
+            - Path=/api/proxy/predictions/**
+          filters:
+            - StripPrefix=2 # Remove /api/proxy to get /predictions
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 30
+                key-resolver: "#{@ipKeyResolver}"
         # 3. Route to Prediction Service
         - id: prediction-service
           uri: lb://prediction-service

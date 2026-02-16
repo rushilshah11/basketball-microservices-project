@@ -68,8 +68,8 @@ services:
         # Reference the JAR file you just built
         - JAR_FILE=target/eureka-server-0.0.1-SNAPSHOT.jar
     container_name: bball_eureka_server
-    expose:
-      - "8761" # Expose Eureka dashboard
+    ports:
+      - "8761:8761" # Expose Eureka dashboard
     environment:
       # Use service name for inter-container communication
       EUREKA_INSTANCE_HOSTNAME: eureka-server
@@ -168,7 +168,7 @@ services:
     restart: always
 
   # ------------------------------------------------------------------------
-  # 7. Prediction Service (PyTorch Neural Network)
+  # 7. Prediction Service
   # ------------------------------------------------------------------------
   prediction:
     build:
@@ -182,6 +182,9 @@ services:
       REDIS_PORT: 6379
       DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@db-prediction:5432/${DB_PREDICTION_NAME}
       STATS_SERVICE_URL: http://stats-service:8081
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SERVICE_NAME: prediction-service
+      SERVICE_PORT: 5002
     depends_on:
       db-prediction:
         condition: service_healthy
@@ -215,43 +218,6 @@ services:
       redis:
         condition: service_started
     restart: always
-
-  # 1. Zipkin (Distributed Tracing) - COMMENTED OUT FOR NOW
-  # zipkin:
-  #   image: openzipkin/zipkin
-  #   container_name: bball_zipkin
-  #   ports:
-  #     - "9411:9411"
-  #   networks:
-  #     - default
-  #   restart: always
-
-  # 2. Prometheus (Metrics Collection) - COMMENTED OUT FOR NOW
-  # prometheus:
-  #   image: prom/prometheus
-  #   container_name: bball_prometheus
-  #   expose:
-  #     - "9090"
-  #   volumes:
-  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
-  #   networks:
-  #     - default
-  #   restart: always
-
-  # 3. Grafana (Dashboard) - COMMENTED OUT FOR NOW
-  # grafana:
-  #   image: grafana/grafana
-  #   container_name: bball_grafana
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - GF_SECURITY_ADMIN_PASSWORD=password # Login with admin/password
-  #   depends_on:
-  #     - prometheus
-  #     - zipkin
-  #   networks:
-  #     - default
-  #   restart: always
 
   frontend:
     build:

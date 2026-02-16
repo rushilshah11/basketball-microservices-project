@@ -1,476 +1,275 @@
-from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
-from typing import List, Optional
-import torch
-import torch.nn as nn
-import numpy as np
+"""
+Basketball Prediction Service - Simple Version
+Returns 0.0 for predictions until XGBoost is implemented.
+This is the main FastAPI application that handles all prediction requests.
+"""
+import asyncio
 import logging
-import py_eureka_client.eureka_client as eureka_client
 import os
-import redis
-import threading
-import json
+import requests
+from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
+import py_eureka_client.eureka_client as eureka_client
+eureka_url = os.getenv('EUREKA_CLIENT_SERVICEURL_DEFAULTZONE')
 
-# Import our new modules
-from database import init_db, get_db
+# Import configuration and models
+from config import LOG_LEVEL
+from database import init_db, get_db, PlayerPrediction
 from cache import PredictionCache, test_redis_connection
-from prediction_service import PredictionService
-from stats_client import stats_client
+from schemas import (
+    PredictionRequest, 
+    PredictionResponse,
+    BatchPredictionRequest,
+)
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("prediction-service")
+# Setup logging based on LOG_LEVEL from config
+logging.basicConfig(level=LOG_LEVEL)
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Basketball Prediction Service")
+# Initialize FastAPI app
+app = FastAPI(
+    title="Basketball Prediction Service",
+    description="Simple prediction service - placeholder until XGBoost implementation",
+    version="1.0.0"
+)
+
 
 # ============================================
-# Neural Network Model
+# Prediction Logic
 # ============================================
 
-class PlayerPerformanceNet(nn.Module):
+def predict_performance(ppg: float, apg: float, rpg: float) -> tuple:
     """
-    Simple feedforward neural network for player performance prediction.
-    Can be extended to GNN in the future.
+    Predict player performance.
+    Currently returns 0.0 placeholder values.
+    Will be replaced with XGBoost implementation.
+    
+    Args:
+        ppg: Points per game
+        apg: Assists per game
+        rpg: Rebounds per game
+    
+    Returns: 
+        Tuple of (predicted_points, predicted_assists, predicted_rebounds, confidence)
     """
-    def __init__(self, input_size=10, hidden_size=64, output_size=3):
-        super(PlayerPerformanceNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.relu1 = nn.ReLU()
-        self.dropout1 = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(hidden_size, hidden_size // 2)
-        self.relu2 = nn.ReLU()
-        self.dropout2 = nn.Dropout(0.3)
-        self.fc3 = nn.Linear(hidden_size // 2, output_size)
-        
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.relu1(x)
-        x = self.dropout1(x)
-        x = self.fc2(x)
-        x = self.relu2(x)
-        x = self.dropout2(x)
-        x = self.fc3(x)
-        return x
+    # TODO: Implement XGBoost model here - for now return placeholder values
+    return 0.0, 0.0, 0.0, 0.0
+
 
 # ============================================
-# Model Initialization
+# Startup/Shutdown Events
 # ============================================
 
-# Initialize model
-model = PlayerPerformanceNet()
-model.eval()  # Set to evaluation mode
-
-logger.info("Neural network model initialized")
-
-# Initialize prediction service
-prediction_service = PredictionService(model)
-
-# ============================================
-# Request/Response Models
-# ============================================
-
-class PlayerStats(BaseModel):
-    """Input features for prediction"""
-    ppg: float  # Points per game
-    apg: float  # Assists per game
-    rpg: float  # Rebounds per game
-    fgPct: Optional[float] = 0.45  # Field goal percentage
-    ftPct: Optional[float] = 0.75  # Free throw percentage
-    gamesPlayed: int
-    minutesPerGame: Optional[float] = 30.0
-    stealsPerGame: Optional[float] = 1.0
-    blocksPerGame: Optional[float] = 0.5
-    turnoversPerGame: Optional[float] = 2.0
-
-class PredictionRequest(BaseModel):
-    playerName: str
-    currentStats: PlayerStats
-    opponent: Optional[str] = "Average"
-    homeGame: bool = True
-
-class PredictionResponse(BaseModel):
-    playerName: str
-    predictedPoints: float
-    predictedAssists: float
-    predictedRebounds: float
-    confidence: float
-    model: str = "basic_nn"
-
-class BatchPredictionRequest(BaseModel):
-    predictions: List[PredictionRequest]
-
-# ============================================
-# Helper Functions
-# ============================================
-
-def normalize_stats(stats: PlayerStats) -> np.ndarray:
-    """
-    Normalize player stats for model input.
-    In production, use pre-computed mean/std from training data.
-    """
-    features = np.array([
-        stats.ppg / 30.0,  # Normalize to typical max
-        stats.apg / 10.0,
-        stats.rpg / 12.0,
-        stats.fgPct,
-        stats.ftPct,
-        stats.gamesPlayed / 82.0,  # NBA season games
-        stats.minutesPerGame / 48.0,  # Max game minutes
-        stats.stealsPerGame / 3.0,
-        stats.blocksPerGame / 3.0,
-        stats.turnoversPerGame / 5.0
-    ])
-    return features
-
-def predict_performance(stats: PlayerStats, home_game: bool = True) -> tuple:
-    """
-    Predict player performance using the neural network.
-    Returns: (predicted_points, predicted_assists, predicted_rebounds, confidence)
-    """
-    try:
-        # Normalize input
-        features = normalize_stats(stats)
-        
-        # Add home/away factor
-        home_factor = 1.05 if home_game else 0.95
-        
-        # Convert to tensor
-        x = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
-        
-        # Make prediction
-        with torch.no_grad():
-            output = model(x)
-            predictions = output.squeeze().numpy()
-        
-        # Apply home factor and denormalize
-        predicted_points = float(predictions[0] * 30.0 * home_factor)
-        predicted_assists = float(predictions[1] * 10.0 * home_factor)
-        predicted_rebounds = float(predictions[2] * 12.0 * home_factor)
-        
-        # Simple confidence based on current form
-        confidence = min(0.95, 0.7 + (stats.gamesPlayed / 82.0) * 0.25)
-        
-        return predicted_points, predicted_assists, predicted_rebounds, confidence
-        
-    except Exception as e:
-        logger.error(f"Prediction error: {e}")
-        raise
-
-# 1. Setup Redis Connection for Events (db=0)
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-REDIS_SSL = os.getenv("REDIS_SSL", "false").lower() == "true"
-redis_event_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, ssl=REDIS_SSL)
-
-# 2. Define the Subscriber Logic
-def redis_listener():
-    """
-    Listen to watchlist events and trigger predictions
-    When a player is added to watchlist, generate and store prediction
-    """
-    pubsub = redis_event_client.pubsub()
-    pubsub.subscribe('watchlist-events')
-
-    logger.info(f"🎧 Listening for events on 'watchlist-events' at {REDIS_HOST}:{REDIS_PORT}...")
-
-    for message in pubsub.listen():
-        if message['type'] == 'message':
-            try:
-                data = json.loads(message['data'])
-                event_type = data.get('eventType')
-                player_name = data.get('playerName')
-
-                logger.info(f"📨 Received Event: {event_type} for {player_name}")
-
-                if event_type == 'PLAYER_ADDED':
-                    # Trigger prediction generation and storage
-                    logger.info(f"🚀 Triggering background prediction for {player_name}")
-                    
-                    # Run async prediction in background
-                    import asyncio
-                    from database import SessionLocal
-                    
-                    try:
-                        # Create new event loop for this thread
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        
-                        # Get database session
-                        db = SessionLocal()
-                        
-                        # Generate prediction
-                        result = loop.run_until_complete(
-                            prediction_service.generate_prediction_for_player(
-                                player_name=player_name,
-                                db=db,
-                                force_refresh=True
-                            )
-                        )
-                        
-                        if result:
-                            logger.info(f"✅ Successfully generated prediction for {player_name}")
-                        else:
-                            logger.warning(f"⚠️ Could not generate prediction for {player_name}")
-                        
-                        db.close()
-                        loop.close()
-                        
-                    except Exception as e:
-                        logger.error(f"❌ Error generating prediction in background: {e}")
-
-            except Exception as e:
-                logger.error(f"❌ Error processing Redis message: {e}")
-
-# ============================================
-# API Endpoints
-# ============================================
-
-# 3. Start Listener in Background Thread on Startup
 @app.on_event("startup")
-async def startup_event():
-    """Initialize database, cache, and start Redis listener"""
+async def startup():
+    """Called when app starts - initialize database and test cache connection"""
+    logger.info("Starting prediction service...")
+    init_db()  # Create database tables if they don't exist
+    test_redis_connection()  # Test if Redis is accessible
     
-    # Initialize database
-    logger.info("🔧 Initializing database...")
-    init_db()
+    # Register with Eureka service discovery
+    asyncio.create_task(register_with_eureka())
     
-    # Test Redis connection
-    logger.info("🔧 Testing Redis connection...")
-    test_redis_connection()
-    
-    # Start Redis listener in background thread
-    listener_thread = threading.Thread(target=redis_listener, daemon=True)
-    listener_thread.start()
-    logger.info("✅ Redis listener started")
+    logger.info("Service started successfully")
 
-    # Register with Eureka
-    await eureka_client.init_async(
-        eureka_server="http://eureka-server:8761/eureka",
-        app_name="PREDICTION-SERVICE",
-        instance_port=5002
-    )
-    logger.info("✅ Registered with Eureka")
+
+async def register_with_eureka():
+    """
+    Attempts to register with Eureka in a loop until successful.
+    This runs in the background so it doesn't crash the app on startup.
+    """
+    while True:
+        try:
+            logger.info("Attempting to register with Eureka...")
+            await eureka_client.init_async(
+                eureka_server=eureka_url,
+                app_name="PREDICTION-SERVICE",
+                instance_port=5002
+            )
+            logger.info("✅ Successfully registered with Eureka!")
+            break  # Exit loop on success
+        except Exception as e:
+            logger.warning(f"❌ Eureka not ready yet ({e}). Retrying in 5 seconds...")
+            await asyncio.sleep(5)
+
 
 @app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    await stats_client.close()
-    logger.info("✅ Shutdown complete")
+async def shutdown():
+    """Called when app shuts down - cleanup resources"""
+    logger.info("Shutting down...")
+
+
+# ============================================
+# Health Check & Info Endpoints
+# ============================================
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint"""
+    """Health check endpoint - used by load balancers and monitoring"""
     return {
         "status": "UP",
         "service": "prediction-service",
-        "model": "PlayerPerformanceNet",
-        "framework": "PyTorch"
+        "version": "1.0.0"
     }
-
-@app.post("/predict", response_model=PredictionResponse)
-def predict_player_performance(request: PredictionRequest):
-    """
-    Predict player performance for next game.
-    """
-    logger.info(f"Prediction request for: {request.playerName}")
-    
-    try:
-        predicted_pts, predicted_ast, predicted_reb, confidence = predict_performance(
-            request.currentStats,
-            request.homeGame
-        )
-        
-        return PredictionResponse(
-            playerName=request.playerName,
-            predictedPoints=round(predicted_pts, 1),
-            predictedAssists=round(predicted_ast, 1),
-            predictedRebounds=round(predicted_reb, 1),
-            confidence=round(confidence, 2)
-        )
-        
-    except Exception as e:
-        logger.error(f"Error predicting for {request.playerName}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/predict/batch")
-def predict_batch(request: BatchPredictionRequest):
-    """
-    Batch prediction for multiple players.
-    """
-    logger.info(f"Batch prediction for {len(request.predictions)} players")
-    
-    results = []
-    for pred_req in request.predictions:
-        try:
-            predicted_pts, predicted_ast, predicted_reb, confidence = predict_performance(
-                pred_req.currentStats,
-                pred_req.homeGame
-            )
-            
-            results.append(PredictionResponse(
-                playerName=pred_req.playerName,
-                predictedPoints=round(predicted_pts, 1),
-                predictedAssists=round(predicted_ast, 1),
-                predictedRebounds=round(predicted_reb, 1),
-                confidence=round(confidence, 2)
-            ))
-        except Exception as e:
-            logger.error(f"Error in batch prediction for {pred_req.playerName}: {e}")
-            # Continue with other predictions
-            
-    return results
-
-@app.get("/model/info")
-def model_info():
-    """
-    Get information about the current model.
-    """
-    return {
-        "modelType": "FeedForward Neural Network",
-        "framework": "PyTorch",
-        "inputFeatures": 10,
-        "outputFeatures": 3,
-        "hiddenLayers": 2,
-        "parameters": sum(p.numel() for p in model.parameters()),
-        "futureEnhancements": ["GNN", "Attention Mechanism", "Player Embeddings"]
-    }
-
-@app.get("/predictions/{player_name}")
-async def get_player_prediction(player_name: str, db: Session = Depends(get_db)):
-    """
-    Get stored prediction for a player (from cache or database)
-    If not found, generates a new prediction
-    """
-    logger.info(f"📊 Fetching prediction for: {player_name}")
-    
-    try:
-        # Try to get stored prediction
-        prediction = prediction_service.get_stored_prediction(player_name, db)
-        
-        if prediction:
-            logger.info(f"✅ Found stored prediction for {player_name}")
-            return prediction
-        
-        # If not found, generate new prediction
-        logger.info(f"🔄 Generating new prediction for {player_name}")
-        prediction = await prediction_service.generate_prediction_for_player(
-            player_name=player_name,
-            db=db,
-            force_refresh=False
-        )
-        
-        if prediction:
-            return prediction
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Could not generate prediction for {player_name}. Stats may be unavailable."
-            )
-    
-    except Exception as e:
-        logger.error(f"Error fetching prediction for {player_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/predictions/{player_name}/refresh")
-async def refresh_player_prediction(player_name: str, db: Session = Depends(get_db)):
-    """
-    Force refresh prediction for a player
-    Invalidates cache and fetches fresh data
-    """
-    logger.info(f"🔄 Force refreshing prediction for: {player_name}")
-    
-    try:
-        # Invalidate cache
-        PredictionCache.delete(player_name)
-        
-        # Generate new prediction
-        prediction = await prediction_service.generate_prediction_for_player(
-            player_name=player_name,
-            db=db,
-            force_refresh=True
-        )
-        
-        if prediction:
-            return {
-                "message": f"Prediction refreshed for {player_name}",
-                "prediction": prediction
-            }
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Could not refresh prediction for {player_name}. Stats may be unavailable."
-            )
-    
-    except Exception as e:
-        logger.error(f"Error refreshing prediction for {player_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/predictions")
-async def get_all_predictions(limit: int = 50, db: Session = Depends(get_db)):
-    """
-    Get all stored predictions (most recent first)
-    """
-    logger.info(f"📋 Fetching all predictions (limit: {limit})")
-    
-    try:
-        predictions = prediction_service.get_all_predictions(db, limit=limit)
-        return {
-            "count": len(predictions),
-            "predictions": predictions
-        }
-    except Exception as e:
-        logger.error(f"Error fetching all predictions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.delete("/cache/invalidate")
-async def invalidate_cache():
-    """
-    Clear all prediction caches
-    Useful for maintenance or when you want fresh predictions
-    """
-    logger.info("🗑️ Invalidating all prediction caches")
-    
-    try:
-        success = PredictionCache.invalidate_all()
-        if success:
-            return {"message": "All prediction caches invalidated"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to invalidate cache")
-    except Exception as e:
-        logger.error(f"Error invalidating cache: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/")
 def root():
-    """Root endpoint"""
+    """Root endpoint - provides service info and available endpoints"""
     return {
         "service": "Basketball Prediction Service",
-        "version": "2.0.0",
-        "features": [
-            "Neural Network Predictions",
-            "Redis Caching",
-            "PostgreSQL Storage",
-            "Stats Service Integration",
-            "Watchlist Event Listener"
-        ],
+        "version": "1.0.0",
+        "status": "Placeholder - XGBoost coming soon",
         "endpoints": {
-            "predict": "/predict",
-            "batch": "/predict/batch",
-            "get_prediction": "/predictions/{player_name}",
-            "refresh_prediction": "/predictions/{player_name}/refresh",
-            "all_predictions": "/predictions",
-            "invalidate_cache": "/cache/invalidate",
             "health": "/health",
-            "info": "/model/info"
+            "predict": "/predict",
+            "predict_batch": "/predict/batch",
+            "get_prediction": "/predictions/{player_name}",
+            "all_predictions": "/predictions",
+            "clear_cache": "/cache/invalidate"
         }
     }
 
-if __name__ == '__main__':
+
+# ============================================
+# Prediction Endpoints - Main API
+# ============================================
+
+@app.post("/predict", response_model=PredictionResponse)
+def predict(request: PredictionRequest):
+    """Get a prediction for a single player"""
+    logger.info(f"Prediction request for: {request.playerName}")
+    
+    try:
+        # Call prediction function with player stats
+        predicted_pts, predicted_ast, predicted_reb, confidence = predict_performance(
+            request.currentStats.ppg,
+            request.currentStats.apg,
+            request.currentStats.rpg
+        )
+        
+        # Return prediction response with validated data
+        return PredictionResponse(
+            playerName=request.playerName,
+            predictedPoints=predicted_pts,
+            predictedAssists=predicted_ast,
+            predictedRebounds=predicted_reb,
+            confidence=confidence
+        )
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict/batch")
+def predict_batch(request: BatchPredictionRequest):
+    """Get predictions for multiple players at once"""
+    logger.info(f"Batch prediction for {len(request.predictions)} players")
+    
+    results = []
+    # Process each player prediction request
+    for pred_req in request.predictions:
+        try:
+            predicted_pts, predicted_ast, predicted_reb, confidence = predict_performance(
+                pred_req.currentStats.ppg,
+                pred_req.currentStats.apg,
+                pred_req.currentStats.rpg
+            )
+            
+            results.append(PredictionResponse(
+                playerName=pred_req.playerName,
+                predictedPoints=predicted_pts,
+                predictedAssists=predicted_ast,
+                predictedRebounds=predicted_reb,
+                confidence=confidence
+            ))
+        except Exception as e:
+            logger.error(f"Error predicting for {pred_req.playerName}: {e}")
+            # Continue processing other predictions even if one fails
+    
+    return results
+
+
+# ============================================
+# Database Query Endpoints
+# ============================================
+
+@app.get("/predictions")
+def get_all_predictions(limit: int = 50, db: Session = Depends(get_db)):
+    """Get all stored predictions from database (most recent first)"""
+    logger.info(f"Fetching predictions (limit: {limit})")
+    
+    try:
+        # Query database with limit
+        predictions = db.query(PlayerPrediction).order_by(
+            PlayerPrediction.created_at.desc()  # Most recent first
+        ).limit(limit).all()
+        
+        # Return count and list of predictions
+        return {
+            "count": len(predictions),
+            "predictions": [p.to_dict() for p in predictions]
+        }
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/predictions/{player_name}")
+def get_prediction(player_name: str, db: Session = Depends(get_db)):
+    """Get stored prediction for a specific player - checks cache first, then database"""
+    logger.info(f"Fetching prediction for: {player_name}")
+    
+    try:
+        # Try Redis cache first (faster)
+        cached = PredictionCache.get(player_name)
+        if cached:
+            logger.info(f"Cache hit for {player_name}")
+            return cached
+        
+        # If not in cache, query database
+        prediction = db.query(PlayerPrediction).filter(
+            PlayerPrediction.player_name == player_name
+        ).order_by(PlayerPrediction.created_at.desc()).first()
+        
+        if prediction:
+            result = prediction.to_dict()
+            # Cache the result for future requests
+            PredictionCache.set(player_name, result)
+            return result
+        
+        # Not found anywhere
+        raise HTTPException(status_code=404, detail=f"No prediction found for {player_name}")
+    
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# Cache Management Endpoints
+# ============================================
+
+@app.delete("/cache/invalidate")
+def invalidate_cache():
+    """Clear all cached predictions - useful for testing or maintenance"""
+    logger.info("Invalidating cache...")
+    
+    try:
+        success = PredictionCache.invalidate_all()  # Clear entire cache
+        if success:
+            return {"message": "Cache cleared"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to clear cache")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    # Run the app with uvicorn when file is executed directly
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=5002)
+    uvicorn.run(app, host="0.0.0.0", port=5002)  # Listen on all interfaces, port 5002
 
