@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { register } from '@/lib/api';
-import { setAuthToken } from '@/lib/auth';
-import { setAuthCookie } from '@/app/actions';
+import { supabase } from '@/lib/supabase';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -13,6 +11,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -33,23 +32,22 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    try {
-      const response = await register(name, email, password);
-      
-      // Set token in client-side cookie (for immediate access)
-      setAuthToken(response.token);
-      
-      // Set HTTP-only cookie via server action
-      await setAuthCookie(response.token);
-      
-      // Redirect to home (which will show dashboard if authenticated)
-      router.push('/');
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    });
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
     }
+    if (!data.session) {
+      // Supabase's "Confirm email" setting is on: user must click the link first.
+      setNotice('Check your email to confirm your account, then sign in.');
+      return;
+    }
+    router.push('/');
   };
 
   return (
@@ -61,6 +59,12 @@ export default function RegisterPage() {
             <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
             <p className="text-gray-300">Join NBA Stats Tracker today</p>
           </div>
+
+          {notice && (
+            <div className="mb-4 p-4 bg-green-500/20 border border-green-500 rounded-lg">
+              <p className="text-green-200 text-sm">{notice}</p>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg">

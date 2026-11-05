@@ -1,0 +1,4 @@
+nba_api>=1.10
+pandas
+psycopg[binary]>=3.2
+python-dotenv

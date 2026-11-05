@@ -1,17 +1,14 @@
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+'use client';
+
 import Link from 'next/link';
 import StatsDashboard from '@/components/StatsDashboard';
+import { useSession } from '@/lib/useSession';
 
-export default async function HomePage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('token');
-  const isAuthenticated = !!token;
+export default function HomePage() {
+  const session = useSession();
 
-  // If authenticated, show dashboard
-  if (isAuthenticated) {
-    return <StatsDashboard />;
-  }
+  if (session === undefined) return null; // still checking login
+  if (session) return <StatsDashboard />;
 
   // Public state: Show hero section
   return (
@@ -55,8 +52,8 @@ export default async function HomePage() {
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
             <div className="text-4xl mb-4">⭐</div>
-            <h3 className="text-xl font-semibold mb-2">Watchlist</h3>
-            <p className="text-gray-300">Build and manage your personal watchlist of favorite players</p>
+            <h3 className="text-xl font-semibold mb-2">Your Team</h3>
+            <p className="text-gray-300">Build your fantasy team and track every player on it</p>
           </div>
         </div>
       </div>

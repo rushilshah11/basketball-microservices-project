@@ -1,36 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { isAuthenticated, removeAuthToken } from '@/lib/auth';
-import { removeAuthCookie } from '@/app/actions';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { useSession } from '@/lib/useSession';
 
 export default function Navbar() {
-  const [authenticated, setAuthenticated] = useState(false);
-  const pathname = usePathname();
+  const session = useSession();
+  const authenticated = !!session;
   const router = useRouter();
 
-  useEffect(() => {
-    setAuthenticated(isAuthenticated());
-      // Event handler for custom auth-change event
-      const handleAuthChange = () => {
-          setAuthenticated(isAuthenticated());
-      };
-      // Listen for custom event
-      window.addEventListener('auth-change', handleAuthChange);
-      // Cleanup
-      return () => {
-          window.removeEventListener('auth-change', handleAuthChange);
-      };
-  }, [pathname]);
-
   const handleLogout = async () => {
-    removeAuthToken();
-    await removeAuthCookie();
-    setAuthenticated(false);
+    await supabase.auth.signOut();
     router.push('/');
-    router.refresh();
   };
 
   return (

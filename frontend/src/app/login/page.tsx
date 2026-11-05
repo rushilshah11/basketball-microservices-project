@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { login } from '@/lib/api';
-import { setAuthToken } from '@/lib/auth';
-import { setAuthCookie } from '@/app/actions';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,23 +17,13 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    try {
-      const response = await login(email, password);
-      
-      // Set token in client-side cookie (for immediate access)
-      setAuthToken(response.token);
-      
-      // Set HTTP-only cookie via server action
-      await setAuthCookie(response.token);
-      
-      // Redirect to home (which will show dashboard if authenticated)
-      router.push('/');
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
     }
+    router.push('/');
   };
 
   return (
@@ -96,7 +84,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center">
             <p className="text-gray-300">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/register" className="text-orange-400 hover:text-orange-300 font-semibold">
                 Register here
               </Link>
