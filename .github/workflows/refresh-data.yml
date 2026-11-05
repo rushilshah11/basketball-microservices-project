@@ -1,9 +1,11 @@
 name: Refresh NBA data
 
+# Schedule is OFF: stats.nba.com blocks GitHub's servers (ReadTimeout), so for now
+# run `python pipeline/seed.py` from your own machine. Re-enable if the data source changes.
 on:
-  schedule:
-    - cron: "17 15 * * *"   # every day at 15:17 UTC (10:17am EST / 11:17am EDT), after last night's games
-  workflow_dispatch:         # adds a "Run workflow" button in the Actions tab
+  # schedule:
+  #   - cron: "17 15 * * *"   # daily at 15:17 UTC (10:17am EST), after last night's games
+  workflow_dispatch:
 
 jobs:
   refresh:
